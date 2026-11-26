@@ -27,15 +27,24 @@
     max-width: 1200px; margin: 0 auto; }
   @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
   section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
-  section h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
-  button { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+  section h2, h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 10px; }
+  h3 { margin-top: 18px; }
+  button, select { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
     border-radius: 8px; padding: 7px 12px; cursor: pointer; }
   button:hover:not(:disabled) { border-color: var(--accent); }
   button:disabled { opacity: .45; cursor: not-allowed; }
   button.primary { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+  button.danger { color: var(--bad); }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .msg { font-size: 13px; color: var(--muted); margin-top: 8px; min-height: 1.2em; }
   .msg.err { color: var(--bad); }
+  .hidden { display: none !important; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 4px; margin: -4px 0 14px; border-bottom: 1px solid var(--line); }
+  .tabs button { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0;
+    padding: 8px 12px; color: var(--muted); font-weight: 600; }
+  .tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
 
   /* 3D cube */
   .views { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
@@ -50,13 +59,14 @@
   .f-B { transform: rotateY(180deg) translateZ(60px); }
   .f-R { transform: rotateY(90deg) translateZ(60px); }
   .f-L { transform: rotateY(-90deg) translateZ(60px); }
-  /* 2D net */
   .net { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; width: min(100%, 360px); }
   .net div { aspect-ratio: 1; border-radius: 3px; transition: background-color .12s; }
   .net .s { outline: 1px solid rgba(0,0,0,.55); outline-offset: -1px; }
   .hint { font-size: 12px; color: var(--muted); text-align: center; }
+  .replay { background: rgba(79,140,255,.1); border: 1px solid var(--accent); border-radius: 10px; padding: 10px; margin-top: 12px; }
+  .replay input[type=range] { flex: 1; min-width: 120px; }
 
-  /* Solver */
+  /* Step guide */
   .next { display: flex; align-items: baseline; gap: 14px; margin: 4px 0 12px; }
   .next .mv { font-size: 56px; font-weight: 800; line-height: 1; min-width: 2.2ch; color: var(--accent); }
   .next .sub { color: var(--muted); font-size: 14px; }
@@ -69,6 +79,31 @@
   .bar { height: 6px; background: var(--panel2); border-radius: 3px; overflow: hidden; margin: 12px 0 4px; }
   .bar > div { height: 100%; width: 0; background: var(--ok); transition: width .2s; }
   .solved-banner { font-size: 22px; font-weight: 700; color: var(--ok); }
+
+  /* Timer */
+  .scr-alg { font: 600 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--panel2);
+    border-radius: 8px; padding: 8px 10px; margin-bottom: 10px; word-spacing: 4px; }
+  .timer { font: 700 64px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center;
+    margin: 14px 0 6px; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .timer.ready { color: var(--ok); }
+  .timer.running { color: var(--text); }
+  .timer-note { text-align: center; color: var(--muted); font-size: 14px; min-height: 1.4em; }
+  .tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .tile { background: var(--panel2); border-radius: 8px; padding: 8px 10px; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 5px 6px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; }
+  .tbl-wrap { overflow-x: auto; }
+  .history { max-height: 260px; overflow: auto; }
+  .history tr { cursor: pointer; }
+  .history tr:hover td, .history tr.sel td { background: var(--panel2); }
+  .recon { font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--panel2);
+    border-radius: 8px; padding: 8px 10px; margin-top: 10px; white-space: pre-wrap; }
+  .recon b { color: var(--muted); font-weight: 600; }
+
   .sim { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
   .sim button { padding: 6px 0; }
   .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted);
@@ -80,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>Mi Smart Magic Cube &middot; Solver</h1>
+  <h1>Mi Smart Magic Cube</h1>
   <div class="row">
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
     <button class="primary" id="btnConnect">Connect cube</button>
@@ -98,6 +133,21 @@
       </div>
       <div class="net" id="net"></div>
     </div>
+
+    <div class="replay hidden" id="replayBar">
+      <div class="row" style="justify-content:space-between">
+        <strong id="replayTitle">Replay</strong>
+        <span id="replayTime" style="font-variant-numeric:tabular-nums"></span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button id="rpPlay">Play</button>
+        <input type="range" id="rpSlider" min="0" max="0" value="0">
+        <select id="rpSpeed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select>
+        <button id="rpExit">Exit</button>
+      </div>
+      <div class="msg" id="replayMove"></div>
+    </div>
+
     <div class="row" style="margin-top:12px">
       <button id="btnMarkSolved" disabled title="Tells the cube its current physical state is solved (use if the cube's internal state got out of sync)">Mark cube as solved</button>
       <span class="msg" id="battery" style="margin:0"></span>
@@ -118,20 +168,75 @@
   </section>
 
   <section>
-    <h2>Solution</h2>
+    <div class="tabs">
+      <button data-tab="guide" class="active">Guided solve</button>
+      <button data-tab="timer">Timer &amp; stats</button>
+    </div>
     <div id="solverStatus" class="msg" style="margin-top:0">Loading solver&hellip;</div>
-    <div class="next">
-      <div class="mv" id="nextMove">&ndash;</div>
-      <div class="sub" id="nextSub"></div>
+
+    <!-- Guided solve -->
+    <div id="tab-guide">
+      <div class="next">
+        <div class="mv" id="gNext">&ndash;</div>
+        <div class="sub" id="gSub"></div>
+      </div>
+      <div class="moves" id="gMoves"></div>
+      <div class="bar"><div id="gProg"></div></div>
+      <div class="msg" id="gProgText"></div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="btnSolve" disabled>Solve current state</button>
+        <label class="chk"><input type="checkbox" id="autoSolve" checked> Auto-recalculate when I go off track</label>
+      </div>
+      <div class="msg" id="solveMsg"></div>
     </div>
-    <div class="moves" id="moves"></div>
-    <div class="bar"><div id="progress"></div></div>
-    <div class="msg" id="progressText"></div>
-    <div class="row" style="margin-top:12px">
-      <button class="primary" id="btnSolve" disabled>Solve current state</button>
-      <label class="chk"><input type="checkbox" id="autoSolve" checked> Auto-recalculate when I go off track</label>
+
+    <!-- Timer -->
+    <div id="tab-timer" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:0">Scramble</h3>
+        <div class="row">
+          <button id="btnNewScramble" disabled>New scramble</button>
+          <button id="btnAbort" class="hidden">Cancel solve</button>
+        </div>
+      </div>
+      <div class="scr-alg" id="scrAlg" style="margin-top:8px">&ndash;</div>
+      <div id="scrGuide">
+        <div class="next" style="margin-bottom:8px">
+          <div class="mv" id="sNext" style="font-size:40px">&ndash;</div>
+          <div class="sub" id="sSub"></div>
+        </div>
+        <div class="moves" id="sMoves"></div>
+        <div class="bar"><div id="sProg"></div></div>
+        <div class="msg" id="sProgText"></div>
+      </div>
+      <div class="timer" id="timer">0.00</div>
+      <div class="timer-note" id="timerNote"></div>
+
+      <h3>Statistics</h3>
+      <div class="tiles">
+        <div class="tile"><div class="k">Best</div><div class="v" id="stBest">–</div></div>
+        <div class="tile"><div class="k">ao5</div><div class="v" id="stAo5">–</div></div>
+        <div class="tile"><div class="k">ao12</div><div class="v" id="stAo12">–</div></div>
+        <div class="tile"><div class="k">Best ao5</div><div class="v" id="stBestAo5">–</div></div>
+        <div class="tile"><div class="k">Mean</div><div class="v" id="stMean">–</div></div>
+        <div class="tile"><div class="k">Solves</div><div class="v" id="stCount">0</div></div>
+      </div>
+
+      <div id="detail" class="hidden">
+        <h3 id="detailTitle">Solve</h3>
+        <div class="tbl-wrap"><table id="splits"></table></div>
+        <div class="recon" id="recon"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnReplay">Replay on cube</button>
+          <button id="btnCopy">Copy reconstruction</button>
+          <button id="btnDelete" class="danger">Delete</button>
+        </div>
+      </div>
+
+      <h3>History</h3>
+      <div class="history"><table id="history"></table></div>
+      <div class="msg" id="historyMsg"></div>
     </div>
-    <div class="msg" id="solveMsg"></div>
   </section>
 </main>
 
@@ -151,6 +256,9 @@ const CHR_CTRL_W = '0000aaac-0000-1000-8000-00805f9b34fb';
 
 const SOLVED = 'UUUUUUUUURRRRRRRRRFFFFFFFFFDDDDDDDDDLLLLLLLLLBBBBBBBBB';
 const FACES = 'URFDLB';
+const ALL_MOVES = [];
+for (const f of FACES) ALL_MOVES.push(f, f + "'", f + '2');
+const STORE_KEY = 'micube.solves.v1';
 
 /* ---------------------------------------------------------------------------
  * Giiker / Xiaomi 20-byte packet decoding
@@ -239,13 +347,90 @@ function applyMoves(state, alg) {
   c.move(alg);
   return c.asString();
 }
-function invertMove(m) {
-  return m.endsWith('2') ? m : m.endsWith("'") ? m[0] : m + "'";
-}
+function invertMove(m) { return m.endsWith('2') ? m : m.endsWith("'") ? m[0] : m + "'"; }
+function invertAlg(alg) { return splitAlg(alg).reverse().map(invertMove).join(' '); }
+function splitAlg(alg) { return alg.trim() ? alg.trim().split(/\s+/) : []; }
 function colorCountsOk(s) {
   if (!s || s.length !== 54) return false;
   for (const ch of FACES) if (s.split(ch).length - 1 !== 9) return false;
   return true;
+}
+/** Which 1 or 2 moves turn `a` into `b`? (2 covers a dropped Bluetooth packet.) null if none. */
+function findMoves(a, b) {
+  for (const m of ALL_MOVES) if (applyMoves(a, m) === b) return [m];
+  for (const m1 of ALL_MOVES) {
+    const s1 = applyMoves(a, m1);
+    for (const m2 of ALL_MOVES) if (m2[0] !== m1[0] && applyMoves(s1, m2) === b) return [m1, m2];
+  }
+  return null;
+}
+/** Merge consecutive turns of the same face: R R -> R2, R R' -> (nothing). */
+function collapseMoves(ms) {
+  const out = [];
+  for (const m of ms) {
+    if (m === '?') { out.push({ raw: '?' }); continue; }
+    const amt = m.endsWith('2') ? 2 : m.endsWith("'") ? 3 : 1;
+    const last = out[out.length - 1];
+    if (last && last.f === m[0]) { last.a = (last.a + amt) % 4; if (!last.a) out.pop(); }
+    else out.push({ f: m[0], a: amt });
+  }
+  return out.map(x => x.raw || x.f + ['', '', '2', "'"][x.a]);
+}
+
+/* ---------------------------------------------------------------------------
+ * CFOP phase analysis (colour neutral: works with the cross on any face)
+ * ------------------------------------------------------------------------- */
+const OPP = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+const faceOf = i => FACES[Math.floor(i / 9)];
+const EDGES = E_FACELET.map(p => p.map(i => ({ i, f: faceOf(i) })));
+const CORNERS = C_FACELET.map(p => p.map(i => ({ i, f: faceOf(i) })));
+const pieceSolved = (s, piece) => piece.every(x => s[x.i] === x.f);
+const CROSS_EDGES = {}, SLOTS = {};
+for (const X of FACES) {
+  CROSS_EDGES[X] = EDGES.filter(e => e.some(x => x.f === X));
+  SLOTS[X] = CORNERS.filter(c => c.some(x => x.f === X)).map(c => {
+    const others = c.filter(x => x.f !== X).map(x => x.f);
+    return { c, e: EDGES.find(e => e.every(x => others.includes(x.f))) };
+  });
+}
+const crossDone = (s, X) => CROSS_EDGES[X].every(e => pieceSolved(s, e));
+const slotCount = (s, X) => SLOTS[X].reduce((n, sl) => n + (pieceSolved(s, sl.c) && pieceSolved(s, sl.e) ? 1 : 0), 0);
+const faceDone = (s, Y) => { const o = FACES.indexOf(Y) * 9; for (let i = 0; i < 9; i++) if (s[o + i] !== Y) return false; return true; };
+
+/** states[0] = scrambled, states[n] = solved; times[i] = ms at which state i was reached (times[0] = 0). */
+function analyzeSolve(states, times) {
+  const n = states.length - 1;
+  // Each stage ends the first time it is reached (OLL/PLL algorithms temporarily break F2L, so
+  // "stays solved" would be wrong). The cross face is the one whose F2L is completed first.
+  const f2lOk = (i, X) => crossDone(states[i], X) && slotCount(states[i], X) === 4;
+  let X = 'D', f2l = n;
+  for (const F of FACES) {
+    let i = 0;
+    while (i < n && !f2lOk(i, F)) i++;
+    if (i < f2l || (i === f2l && F === 'D')) { f2l = i; X = F; }
+  }
+  let cross = 0;
+  while (cross < f2l && !crossDone(states[cross], X)) cross++;
+  const pair = [];
+  let from = cross;
+  for (let k = 1; k <= 3; k++) {
+    let i = from;
+    while (i < f2l && !(crossDone(states[i], X) && slotCount(states[i], X) >= k)) i++;
+    pair.push(i);
+    from = i;
+  }
+  const Y = OPP[X];
+  let oll = f2l;
+  while (oll < n && !(faceDone(states[oll], Y) && f2lOk(oll, X))) oll++;
+
+  const bounds = [['Cross', 0, cross], ['F2L 1', cross, pair[0]], ['F2L 2', pair[0], pair[1]],
+    ['F2L 3', pair[1], pair[2]], ['F2L 4', pair[2], f2l], ['OLL', f2l, oll], ['PLL', oll, n]];
+  const phases = bounds.map(([name, a, b]) => {
+    const time = times[b] - times[a];
+    const recog = b > a && a > 0 ? times[a + 1] - times[a] : 0;
+    return { name, a, b, time, recog, exec: time - recog, turns: b - a };
+  });
+  return { crossFace: X, phases };
 }
 
 /* ---------------------------------------------------------------------------
@@ -253,7 +438,7 @@ function colorCountsOk(s) {
  * ------------------------------------------------------------------------- */
 const cube3d = document.getElementById('cube3d');
 const netEl = document.getElementById('net');
-const sticker3d = [];   // facelet index -> element
+const sticker3d = [];
 const stickerNet = [];
 
 (function buildViews() {
@@ -267,7 +452,6 @@ const stickerNet = [];
     }
     cube3d.appendChild(face);
   }
-  // Net layout on a 12x9 grid: U top, L F R B middle, D bottom.
   const origin = { U: [0, 3], L: [3, 0], F: [3, 3], R: [3, 6], B: [3, 9], D: [6, 3] };
   const cells = new Array(108).fill(null);
   for (let fi = 0; fi < 6; fi++) {
@@ -289,7 +473,6 @@ function render(state) {
   }
 }
 
-// Drag-to-rotate for the 3D view.
 (function setupDrag() {
   const scene = document.getElementById('scene');
   let rx = -28, ry = -38, drag = null;
@@ -308,16 +491,23 @@ function render(state) {
 })();
 
 /* ---------------------------------------------------------------------------
- * Logging / status
+ * Logging / status / formatting
  * ------------------------------------------------------------------------- */
-const logEl = document.getElementById('log');
+const $ = id => document.getElementById(id);
+const logEl = $('log');
 function log(msg) {
   const t = new Date().toLocaleTimeString();
   logEl.textContent = `${t}  ${msg}\n` + logEl.textContent.slice(0, 6000);
 }
 function setStatus(text, kind) {
-  document.getElementById('statusText').textContent = text;
-  document.getElementById('dot').className = 'dot' + (kind ? ' ' + kind : '');
+  $('statusText').textContent = text;
+  $('dot').className = 'dot' + (kind ? ' ' + kind : '');
+}
+function fmt(ms) {
+  if (ms == null || !isFinite(ms)) return '–';
+  const cs = Math.floor(ms / 10), s = Math.floor(cs / 100), m = Math.floor(s / 60);
+  const rest = `${s % 60}.${String(cs % 100).padStart(2, '0')}`;
+  return m ? `${m}:${rest.padStart(5, '0')}` : rest;
 }
 
 /* ---------------------------------------------------------------------------
@@ -332,8 +522,11 @@ const solver = {
       Cube.initSolver();
       postMessage({ ready: true });
       onmessage = (e) => {
-        try { postMessage({ id: e.data.id, solution: Cube.fromString(e.data.state).solve() }); }
-        catch (err) { postMessage({ id: e.data.id, error: String(err) }); }
+        const d = e.data;
+        try {
+          const result = d.op === 'scramble' ? Cube.scramble() : Cube.fromString(d.state).solve();
+          postMessage({ id: d.id, result });
+        } catch (err) { postMessage({ id: d.id, error: String(err) }); }
       };`;
     try {
       const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
@@ -364,14 +557,14 @@ const solver = {
     if (!p) return;
     this.pending.delete(d.id);
     clearTimeout(p.timer);
-    d.error ? p.reject(new Error(d.error)) : p.resolve(d.solution);
+    d.error ? p.reject(new Error(d.error)) : p.resolve(d.result);
   },
 
-  solve(state) {
+  request(msg) {
     if (!this.ready) return Promise.reject(new Error('Solver not ready'));
     if (this.mainThread) {
       return new Promise((res, rej) => setTimeout(() => {
-        try { res(Cube.fromString(state).solve()); } catch (e) { rej(e); }
+        try { res(msg.op === 'scramble' ? Cube.scramble() : Cube.fromString(msg.state).solve()); } catch (e) { rej(e); }
       }, 0));
     }
     const id = ++this.seq;
@@ -383,93 +576,81 @@ const solver = {
         this.worker.terminate(); this.ready = false; this.init();
       }, 15000);
       this.pending.set(id, { resolve, reject, timer });
-      this.worker.postMessage({ id, state });
+      this.worker.postMessage({ ...msg, id });
     });
-  }
+  },
+  solve(state) { return this.request({ op: 'solve', state }); },
+  scramble() { return this.request({ op: 'scramble' }); },
 };
+
+/** Moves that take `from` to the solved state (targetAlg empty) or to the state `targetAlg` produces from solved. */
+async function pathTo(from, targetAlg) {
+  if (!targetAlg) return from === SOLVED ? [] : splitAlg(await solver.solve(from));
+  if (from === SOLVED) return splitAlg(targetAlg);
+  // We need m with from·m = T, i.e. solve Y = T⁻¹·from.
+  const y = new Cube();
+  y.move(invertAlg(targetAlg));
+  y.multiply(Cube.fromString(from));
+  const ys = y.asString();
+  return ys === SOLVED ? [] : splitAlg(await solver.solve(ys));
+}
 
 /* ---------------------------------------------------------------------------
- * Solution tracking.
- * Tracking is state-based: we precompute the expected cube state after every
- * step and match each incoming state against them. This tolerates dropped
- * packets, half turns done as two quarter turns in either direction, and undos.
+ * Step tracker: follows a move sequence by comparing cube states.
+ * We precompute the expected state after every step and match incoming states
+ * against them. This tolerates dropped packets, half turns done as two quarter
+ * turns in either direction, and undos.
  * ------------------------------------------------------------------------- */
-const plan = {
-  moves: [],      // e.g. ["R", "U'", "F2"]
-  states: [],     // states[k] = expected state after k moves (states[0] = start)
-  idx: 0,         // moves completed
-  half: false,    // first quarter of a half-turn done
-  active: false,
-};
-
-let current = SOLVED;
-let solving = false;
-
-function setPlan(moves, start) {
-  plan.moves = moves;
-  plan.states = [start];
-  for (const m of moves) plan.states.push(applyMoves(plan.states[plan.states.length - 1], m));
-  plan.idx = 0; plan.half = false; plan.active = moves.length > 0;
-  renderPlan();
-}
-
-function clearPlan() {
-  plan.moves = []; plan.states = []; plan.idx = 0; plan.half = false; plan.active = false;
-  renderPlan();
-}
-
-/** Returns true if the new state is consistent with the plan (plan updated), false if off-track. */
-function trackState(s) {
-  if (!plan.active) return true;
-  // Jump forward (or back, after an undo) to any matching expected state.
-  for (let k = plan.states.length - 1; k >= 0; k--) {
-    if (plan.states[k] === s) { plan.idx = k; plan.half = false; return true; }
+class Tracker {
+  constructor(prefix) {
+    this.el = {};
+    for (const k of ['Moves', 'Next', 'Sub', 'Prog', 'ProgText']) this.el[k] = $(prefix + k);
+    this.clear();
   }
-  // Halfway through a half-turn?
-  const m = plan.moves[plan.idx];
-  if (m && m.endsWith('2')) {
-    const base = plan.states[plan.idx];
-    if (applyMoves(base, m[0]) === s || applyMoves(base, m[0] + "'") === s) { plan.half = true; return true; }
+  set(moves, start) {
+    this.moves = moves;
+    this.states = [start];
+    for (const m of moves) this.states.push(applyMoves(this.states[this.states.length - 1], m));
+    this.idx = 0; this.half = false; this.active = true;
   }
-  return false;
-}
-
-function renderPlan() {
-  const movesEl = document.getElementById('moves');
-  const next = document.getElementById('nextMove');
-  const sub = document.getElementById('nextSub');
-  const prog = document.getElementById('progress');
-  const progText = document.getElementById('progressText');
-  movesEl.innerHTML = '';
-
-  if (current === SOLVED) {
-    next.innerHTML = '<span class="solved-banner">Solved!</span>';
-    sub.textContent = plan.moves.length ? `${plan.moves.length} moves` : '';
-    prog.style.width = plan.moves.length ? '100%' : '0';
-    progText.textContent = '';
-    plan.moves.forEach(m => { const s = document.createElement('span'); s.textContent = m; s.className = 'done'; movesEl.appendChild(s); });
-    return;
+  clear() { this.moves = []; this.states = []; this.idx = 0; this.half = false; this.active = false; }
+  get target() { return this.states[this.states.length - 1]; }
+  /** true if `s` is on the planned path (progress updated), false if off track. */
+  track(s) {
+    if (!this.active) return true;
+    for (let k = this.states.length - 1; k >= 0; k--) {
+      if (this.states[k] === s) { this.idx = k; this.half = false; return true; }
+    }
+    const m = this.moves[this.idx];
+    if (m && m.endsWith('2')) {
+      const base = this.states[this.idx];
+      if (applyMoves(base, m[0]) === s || applyMoves(base, m[0] + "'") === s) { this.half = true; return true; }
+    }
+    return false;
   }
-  if (!plan.active) {
-    next.textContent = '–';
-    sub.textContent = solver.ready ? 'Scramble the cube, then press “Solve”.' : '';
-    prog.style.width = '0'; progText.textContent = '';
-    return;
+  renderMessage(html, sub) {
+    this.el.Moves.innerHTML = '';
+    this.el.Next.innerHTML = html;
+    this.el.Sub.textContent = sub || '';
+    this.el.Prog.style.width = '0';
+    this.el.ProgText.textContent = '';
   }
-  plan.moves.forEach((m, i) => {
-    const s = document.createElement('span');
-    s.textContent = m;
-    if (i < plan.idx) s.className = 'done';
-    else if (i === plan.idx) s.className = plan.half ? 'half' : 'cur';
-    movesEl.appendChild(s);
-  });
-  const m = plan.moves[plan.idx];
-  next.textContent = m || '–';
-  sub.textContent = m
-    ? (plan.half ? 'one more quarter turn, same direction' : describeMove(m))
-    : '';
-  prog.style.width = (100 * plan.idx / plan.moves.length) + '%';
-  progText.textContent = `Step ${Math.min(plan.idx + 1, plan.moves.length)} of ${plan.moves.length}`;
+  renderSteps() {
+    const { Moves, Next, Sub, Prog, ProgText } = this.el;
+    Moves.innerHTML = '';
+    this.moves.forEach((m, i) => {
+      const s = document.createElement('span');
+      s.textContent = m;
+      if (i < this.idx) s.className = 'done';
+      else if (i === this.idx) s.className = this.half ? 'half' : 'cur';
+      Moves.appendChild(s);
+    });
+    const m = this.moves[this.idx];
+    Next.textContent = m || '✓';
+    Sub.textContent = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(m)) : '';
+    Prog.style.width = (this.moves.length ? 100 * this.idx / this.moves.length : 100) + '%';
+    ProgText.textContent = this.moves.length ? `Step ${Math.min(this.idx + 1, this.moves.length)} of ${this.moves.length}` : '';
+  }
 }
 
 function describeMove(m) {
@@ -479,53 +660,363 @@ function describeMove(m) {
 }
 
 function solverStatus(text, err) {
-  const el = document.getElementById('solverStatus');
+  const el = $('solverStatus');
   el.textContent = text; el.className = 'msg' + (err ? ' err' : '');
 }
 
-async function solveNow(reason) {
-  if (!solver.ready || solving) return;
-  const msg = document.getElementById('solveMsg');
-  if (current === SOLVED) { clearPlan(); msg.textContent = 'Cube is already solved.'; return; }
-  if (!colorCountsOk(current)) { msg.textContent = 'Current state looks invalid; cannot solve.'; msg.className = 'msg err'; return; }
-  solving = true;
-  const start = current;
-  msg.className = 'msg';
-  msg.textContent = reason ? reason + ' Calculating…' : 'Calculating…';
-  const t0 = performance.now();
-  try {
-    const sol = (await solver.solve(start)).trim();
-    const moves = sol ? sol.split(/\s+/) : [];
-    setPlan(moves, start);
-    msg.textContent = `${moves.length} moves, found in ${Math.round(performance.now() - t0)} ms.`;
-    // The cube may have moved while we were solving.
-    if (current !== start) onStateChange(current, null, true);
-  } catch (e) {
-    msg.textContent = e.message; msg.className = 'msg err';
-  } finally {
-    solving = false;
+/* ---------------------------------------------------------------------------
+ * App state
+ * ------------------------------------------------------------------------- */
+let current = SOLVED;
+let mode = 'guide';
+const guide = new Tracker('g');
+const scr = new Tracker('s');
+
+/* ---------------------------- Guided solve ------------------------------- */
+let guideBusy = false;
+
+function renderGuide() {
+  if (current === SOLVED) {
+    guide.renderMessage('<span class="solved-banner">Solved!</span>', guide.moves.length ? `${guide.moves.length} moves` : '');
+    if (guide.moves.length) guide.el.Prog.style.width = '100%';
+  } else if (!guide.active) {
+    guide.renderMessage('–', solver.ready ? 'Scramble the cube, then press “Solve”.' : '');
+  } else {
+    guide.renderSteps();
   }
 }
 
-function onSolverReady() {
-  solverStatus('Solver ready (Kociemba two-phase).');
-  document.getElementById('btnSolve').disabled = false;
-  renderPlan();
+async function solveNow(reason) {
+  if (!solver.ready || guideBusy) return;
+  const msg = $('solveMsg');
+  msg.className = 'msg';
+  if (current === SOLVED) { guide.clear(); renderGuide(); msg.textContent = 'Cube is already solved.'; return; }
+  if (!colorCountsOk(current)) { msg.textContent = 'Current state looks invalid; cannot solve.'; msg.className = 'msg err'; return; }
+  guideBusy = true;
+  const start = current;
+  msg.textContent = reason ? reason + ' Calculating…' : 'Calculating…';
+  const t0 = performance.now();
+  try {
+    const moves = await pathTo(start, '');
+    guide.set(moves, start);
+    msg.textContent = `${moves.length} moves, found in ${Math.round(performance.now() - t0)} ms.`;
+    if (current !== start) guideOnState(null);   // cube moved while solving
+    else renderGuide();
+  } catch (e) {
+    msg.textContent = e.message; msg.className = 'msg err';
+  } finally {
+    guideBusy = false;
+  }
+}
+
+function guideOnState(move) {
+  const onTrack = guide.track(current);
+  if (current === SOLVED) guide.active = false;
+  renderGuide();
+  if (current !== SOLVED && !onTrack && !guideBusy) {
+    if ($('autoSolve').checked) solveNow(`Off track${move ? ' (' + move + ')' : ''}.`);
+    else { guide.clear(); renderGuide(); $('solveMsg').textContent = 'Off the planned path — press “Solve” for a new solution.'; }
+  }
+}
+
+/* ------------------------------- Timer ----------------------------------- */
+// phase: idle -> scrambling -> ready -> running -> (saved) -> scrambling ...
+const timer = { phase: 'idle', scramble: '', target: null, t0: 0, rec: [], states: [], raf: 0, busy: false };
+
+async function newScramble() {
+  if (!solver.ready) return;
+  cancelRun();
+  timer.phase = 'scrambling';
+  timer.scramble = '';
+  scr.clear();
+  renderTimer('Generating scramble…');
+  try {
+    timer.scramble = (await solver.scramble()).trim();
+    timer.target = applyMoves(SOLVED, timer.scramble);
+    await replanScramble();
+  } catch (e) {
+    timer.phase = 'idle';
+    renderTimer('Scramble failed: ' + e.message);
+  }
+}
+
+async function replanScramble(reason) {
+  if (timer.busy) return;
+  timer.busy = true;
+  renderTimer((reason ? reason + ' ' : '') + 'Calculating scramble path…');
+  const from = current;
+  try {
+    scr.set(await pathTo(from, timer.scramble), from);
+  } catch (e) {
+    timer.busy = false;
+    renderTimer('Error: ' + e.message);
+    return;
+  }
+  timer.busy = false;
+  if (timer.phase !== 'scrambling') return;
+  if (current === timer.target) timer.phase = 'ready';
+  else if (current !== from && !scr.track(current)) { replanScramble('Off track.'); return; }   // cube moved meanwhile
+  renderTimer();
+}
+
+function cancelRun() {
+  cancelAnimationFrame(timer.raf);
+  timer.rec = []; timer.states = [];
+  if (timer.phase === 'running' || timer.phase === 'ready') timer.phase = 'idle';
+}
+
+function timerOnState(prev, moves) {
+  const now = performance.now();
+  if (timer.phase === 'scrambling') {
+    if (timer.busy) return;
+    const ok = scr.track(current);
+    if (current === timer.target) timer.phase = 'ready';
+    else if (!ok) { replanScramble('Off track.'); return; }
+    renderTimer();
+    return;
+  }
+  if (timer.phase === 'ready') {
+    timer.phase = 'running';
+    timer.t0 = now;
+    timer.states = [prev];
+    timer.rec = [];
+    tick();
+  }
+  if (timer.phase === 'running') {
+    let s = prev;
+    const t = Math.round(now - timer.t0);
+    for (const m of moves) {
+      s = m === '?' ? current : applyMoves(s, m);
+      timer.rec.push(m === '?' ? { m, t, s } : { m, t });
+      timer.states.push(s);
+    }
+    if (current === SOLVED) finishSolve(t);
+    else renderTimer();
+  }
+}
+
+function tick() {
+  cancelAnimationFrame(timer.raf);
+  const loop = () => {
+    if (timer.phase !== 'running') return;
+    $('timer').textContent = fmt(performance.now() - timer.t0);
+    timer.raf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+function finishSolve(total) {
+  cancelAnimationFrame(timer.raf);
+  const times = [0, ...timer.rec.map(r => r.t)];
+  const analysis = analyzeSolve(timer.states, times);
+  const solve = {
+    id: Date.now(), date: new Date().toISOString(), time: total,
+    scramble: timer.scramble, start: timer.states[0], moves: timer.rec,
+    crossFace: analysis.crossFace, phases: analysis.phases,
+  };
+  solves.push(solve);
+  saveSolves();
+  selectedId = solve.id;
+  timer.phase = 'idle';
+  $('timer').textContent = fmt(total);
+  renderStats(); renderHistory(); renderDetail();
+  renderTimer(`Solved in ${fmt(total)}. Next scramble…`);
+  setTimeout(() => { if (timer.phase === 'idle' && mode === 'timer') newScramble(); }, 800);
+}
+
+function renderTimer(note) {
+  const t = $('timer');
+  $('scrAlg').textContent = timer.scramble || '–';
+  $('btnAbort').classList.toggle('hidden', timer.phase !== 'running');
+  $('btnNewScramble').disabled = !solver.ready || timer.phase === 'running';
+  $('scrGuide').classList.toggle('hidden', timer.phase === 'running');
+  t.className = 'timer' + (timer.phase === 'ready' ? ' ready' : timer.phase === 'running' ? ' running' : '');
+
+  if (timer.phase === 'scrambling') {
+    if (timer.busy || !scr.active) scr.renderMessage('…', 'Calculating…');
+    else scr.renderSteps();
+    if (timer.phase === 'scrambling' && current !== SOLVED && scr.active && scr.idx === 0 && !note && timer.scramble && scr.moves.join(' ') !== timer.scramble)
+      note = 'Your cube wasn\'t solved, so these moves take it straight to the scramble.';
+    t.textContent = '0.00';
+  } else if (timer.phase === 'ready') {
+    scr.renderMessage('✓', 'Scramble done');
+    scr.el.Prog.style.width = '100%';
+    t.textContent = '0.00';
+    note = note || 'Ready! The timer starts on your first turn.';
+  } else if (timer.phase === 'idle') {
+    if (!timer.scramble) scr.renderMessage('–', '');
+  }
+  $('timerNote').textContent = note || (timer.phase === 'scrambling' ? 'Apply the scramble.' : timer.phase === 'running' ? 'Solving… the timer stops when the cube is solved.' : '');
+}
+
+/* ------------------------------- History --------------------------------- */
+let solves = [];
+let selectedId = null;
+
+function loadSolves() {
+  try { solves = JSON.parse(localStorage.getItem(STORE_KEY) || '[]'); } catch (e) { solves = []; }
+  if (!Array.isArray(solves)) solves = [];
+}
+function saveSolves() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(solves)); $('historyMsg').textContent = ''; }
+  catch (e) { $('historyMsg').textContent = 'Could not save history on this device (storage unavailable). Solves are kept until you close the page.'; }
+}
+
+/** Average of n, WCA style: drop best and worst, mean of the rest. */
+function aoN(list, n) {
+  if (list.length < n) return null;
+  const s = list.slice(-n).map(x => x.time).sort((a, b) => a - b);
+  const trim = Math.ceil(n * 0.05) || 1;
+  const mid = s.slice(trim, n - trim);
+  return mid.reduce((a, b) => a + b, 0) / mid.length;
+}
+
+function renderStats() {
+  const times = solves.map(s => s.time);
+  $('stBest').textContent = times.length ? fmt(Math.min(...times)) : '–';
+  $('stAo5').textContent = fmt(aoN(solves, 5));
+  $('stAo12').textContent = fmt(aoN(solves, 12));
+  let best5 = null;
+  for (let i = 5; i <= solves.length; i++) { const a = aoN(solves.slice(0, i), 5); if (best5 === null || a < best5) best5 = a; }
+  $('stBestAo5').textContent = fmt(best5);
+  $('stMean').textContent = times.length ? fmt(times.reduce((a, b) => a + b, 0) / times.length) : '–';
+  $('stCount').textContent = solves.length;
+}
+
+function renderHistory() {
+  const tbl = $('history');
+  if (!solves.length) { tbl.innerHTML = '<tr><td style="color:var(--muted)">No solves yet. Open this tab, apply the scramble and solve.</td></tr>'; return; }
+  let html = '<tr><th>#</th><th>Time</th><th>ao5</th><th>Turns</th><th>TPS</th><th>Date</th></tr>';
+  for (let i = solves.length - 1; i >= 0; i--) {
+    const s = solves[i];
+    const turns = s.moves.length;
+    const ao5 = aoN(solves.slice(0, i + 1), 5);
+    const d = new Date(s.date);
+    html += `<tr data-id="${s.id}" class="${s.id === selectedId ? 'sel' : ''}"><td>${i + 1}</td><td><strong>${fmt(s.time)}</strong></td>` +
+      `<td>${fmt(ao5)}</td><td>${turns}</td><td>${(turns / Math.max(s.time / 1000, 0.01)).toFixed(2)}</td>` +
+      `<td>${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td></tr>`;
+  }
+  tbl.innerHTML = html;
+}
+
+function phaseMoves(s, p) { return s.moves.slice(p.a, p.b).map(r => r.m); }
+
+function renderDetail() {
+  const s = solves.find(x => x.id === selectedId);
+  $('detail').classList.toggle('hidden', !s);
+  if (!s) return;
+  const idx = solves.indexOf(s) + 1;
+  $('detailTitle').textContent = `Solve #${idx} · ${fmt(s.time)} · cross on ${s.crossFace}`;
+  let html = '<tr><th>Phase</th><th>Time</th><th>Recog.</th><th>Exec.</th><th>Turns</th><th>TPS</th></tr>';
+  for (const p of s.phases) {
+    const skip = p.turns === 0 ? ' <span style="color:var(--ok)">skip</span>' : '';
+    const tps = p.exec > 0 ? (p.turns / (p.exec / 1000)).toFixed(2) : '–';
+    html += `<tr><td>${p.name}${skip}</td><td>${fmt(p.time)}</td><td>${fmt(p.recog)}</td><td>${fmt(p.exec)}</td><td>${p.turns}</td><td>${tps}</td></tr>`;
+  }
+  const total = s.moves.length;
+  html += `<tr><td><strong>Total</strong></td><td><strong>${fmt(s.time)}</strong></td><td>${fmt(s.phases.reduce((a, p) => a + p.recog, 0))}</td>` +
+    `<td>${fmt(s.phases.reduce((a, p) => a + p.exec, 0))}</td><td>${total}</td><td>${(total / Math.max(s.time / 1000, 0.01)).toFixed(2)}</td></tr>`;
+  $('splits').innerHTML = html;
+  $('recon').innerHTML = reconstruction(s).split('\n').map(l => l.replace(/^([^:]+):/, '<b>$1:</b>')).join('\n');
+}
+
+function reconstruction(s) {
+  const lines = [`Scramble: ${s.scramble}`];
+  for (const p of s.phases) {
+    const ms = collapseMoves(phaseMoves(s, p));
+    lines.push(`${p.name}: ${ms.length ? ms.join(' ') : '(skip)'}`);
+  }
+  return lines.join('\n');
+}
+
+/* ------------------------------- Replay ---------------------------------- */
+const replay = { active: false, frames: [], idx: 0, time: 0, playing: false, raf: 0, last: 0 };
+
+function startReplay(s) {
+  const frames = [{ s: s.start, t: 0, m: '' }];
+  let st = s.start;
+  for (const r of s.moves) { st = r.m === '?' ? r.s : applyMoves(st, r.m); frames.push({ s: st, t: r.t, m: r.m }); }
+  Object.assign(replay, { active: true, frames, idx: 0, time: 0, playing: false });
+  $('replayBar').classList.remove('hidden');
+  $('replayTitle').textContent = `Replay: solve #${solves.indexOf(s) + 1}`;
+  $('rpSlider').max = frames.length - 1;
+  showFrame(0);
+  $('replayBar').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  playReplay(true);
+}
+function showFrame(i) {
+  replay.idx = i;
+  const f = replay.frames[i];
+  render(f.s);
+  $('rpSlider').value = i;
+  $('replayTime').textContent = `${fmt(f.t)} / ${fmt(replay.frames[replay.frames.length - 1].t)}`;
+  $('replayMove').textContent = i ? `Turn ${i} of ${replay.frames.length - 1}: ${f.m}` : 'Scrambled state';
+}
+function playReplay(on) {
+  replay.playing = on;
+  $('rpPlay').textContent = on ? 'Pause' : 'Play';
+  cancelAnimationFrame(replay.raf);
+  if (!on) return;
+  if (replay.idx >= replay.frames.length - 1) { replay.idx = 0; replay.time = 0; showFrame(0); }
+  replay.last = performance.now();
+  const loop = now => {
+    replay.time += (now - replay.last) * parseFloat($('rpSpeed').value);
+    replay.last = now;
+    let i = replay.idx;
+    while (i + 1 < replay.frames.length && replay.frames[i + 1].t <= replay.time) i++;
+    if (i !== replay.idx) showFrame(i);
+    if (i >= replay.frames.length - 1) { playReplay(false); return; }
+    replay.raf = requestAnimationFrame(loop);
+  };
+  replay.raf = requestAnimationFrame(loop);
+}
+function exitReplay() {
+  playReplay(false);
+  replay.active = false;
+  $('replayBar').classList.add('hidden');
+  render(current);
 }
 
 /* ---------------------------------------------------------------------------
  * Central state update (from Bluetooth or the virtual cube)
  * ------------------------------------------------------------------------- */
-function onStateChange(state, move, force) {
-  if (state === current && !force) return;
+function onStateChange(state, move) {
+  if (state === current) return;
+  const prev = current;
   current = state;
-  render(current);
-  const onTrack = trackState(current);
-  renderPlan();
-  if (current === SOLVED) { plan.active = false; return; }
-  if (!onTrack && !solving) {
-    if (document.getElementById('autoSolve').checked) solveNow(`Off track${move ? ' (' + move + ')' : ''}.`);
-    else { clearPlan(); document.getElementById('solveMsg').textContent = 'Off the planned path — press “Solve” for a new solution.'; }
+  if (!replay.active) render(current);
+  if (mode === 'timer') {
+    let moves = move && applyMoves(prev, move) === state ? [move] : null;
+    if (!moves && timer.phase === 'running') moves = findMoves(prev, state) || ['?'];
+    timerOnState(prev, moves || []);
+  } else {
+    guideOnState(move);
+  }
+}
+
+function onSolverReady() {
+  solverStatus('Solver ready (Kociemba two-phase).');
+  $('btnSolve').disabled = false;
+  renderGuide();
+  renderTimer();
+  if (mode === 'timer' && timer.phase === 'idle') newScramble();
+}
+
+function setMode(m) {
+  mode = m;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === m));
+  $('tab-guide').classList.toggle('hidden', m !== 'guide');
+  $('tab-timer').classList.toggle('hidden', m !== 'timer');
+  try { localStorage.setItem('micube.tab', m); } catch (e) { /* ignore */ }
+  if (m === 'timer') {
+    if (timer.phase === 'idle' && solver.ready) newScramble();
+    else if (timer.phase === 'scrambling' && !timer.busy && scr.active && !scr.track(current)) replanScramble('Cube changed.');
+    else if (timer.phase === 'ready' && current !== timer.target) { timer.phase = 'scrambling'; replanScramble('Cube changed.'); }
+    renderTimer();
+  } else {
+    if (timer.phase === 'running' || timer.phase === 'ready') { cancelRun(); renderTimer('Solve cancelled.'); }
+    if (guide.active && !guide.track(current)) guide.clear();
+    renderGuide();
   }
 }
 
@@ -560,25 +1051,24 @@ async function connect() {
     log('Notifications started on ' + CHR_STATE);
     try { handlePacket(await stateChar.readValue()); } catch (e) { log('Initial read failed: ' + e.message); }
 
-    // Optional control channel (battery level + "mark solved").
     try {
       const ctrl = await server.getPrimaryService(SVC_CTRL);
       ctrlWrite = await ctrl.getCharacteristic(CHR_CTRL_W);
       const ctrlRead = await ctrl.getCharacteristic(CHR_CTRL_R);
       ctrlRead.addEventListener('characteristicvaluechanged', e => {
         const v = e.target.value;
-        if (v.byteLength >= 2 && v.getUint8(0) === 0xb5) document.getElementById('battery').textContent = 'Battery: ' + v.getUint8(1) + '%';
+        if (v.byteLength >= 2 && v.getUint8(0) === 0xb5) $('battery').textContent = 'Battery: ' + v.getUint8(1) + '%';
       });
       await ctrlRead.startNotifications();
       await ctrlWrite.writeValue(new Uint8Array([0xb5]));
-      document.getElementById('btnMarkSolved').disabled = false;
+      $('btnMarkSolved').disabled = false;
     } catch (e) {
       log('Control service not available: ' + e.message);
     }
 
     setStatus('Connected: ' + (device.name || 'cube'), 'on');
-    document.getElementById('btnConnect').disabled = true;
-    document.getElementById('btnDisconnect').disabled = false;
+    $('btnConnect').disabled = true;
+    $('btnDisconnect').disabled = false;
   } catch (e) {
     log('Connect failed: ' + e.message);
     setStatus(e.name === 'NotFoundError' ? 'Not connected' : 'Error: ' + e.message, '');
@@ -589,10 +1079,10 @@ function onDisconnected() {
   log('Disconnected');
   setStatus('Disconnected', '');
   stateChar = null; ctrlWrite = null;
-  document.getElementById('btnConnect').disabled = false;
-  document.getElementById('btnDisconnect').disabled = true;
-  document.getElementById('btnMarkSolved').disabled = true;
-  document.getElementById('battery').textContent = '';
+  $('btnConnect').disabled = false;
+  $('btnDisconnect').disabled = true;
+  $('btnMarkSolved').disabled = true;
+  $('battery').textContent = '';
 }
 
 function handlePacket(dv) {
@@ -602,7 +1092,6 @@ function handlePacket(dv) {
   if (!r) { log('short packet ' + hex); return; }
   if (!r.valid) { log('unrecognised packet ' + hex); return; }
   const move = r.moves[0] || null;
-  // Consistency check: does the reported last move explain the state change?
   if (move && current !== r.facelets && applyMoves(current, move) !== r.facelets) {
     log(`state jump (last move ${move} doesn't explain it) ${hex}`);
   } else {
@@ -615,32 +1104,38 @@ function handlePacket(dv) {
  * Virtual cube controls
  * ------------------------------------------------------------------------- */
 (function setupSim() {
-  const sim = document.getElementById('sim');
+  const sim = $('sim');
   for (const suf of ['', "'"]) for (const f of 'URFDLB') {
     const b = document.createElement('button');
     b.textContent = f + suf;
     b.onclick = () => onStateChange(applyMoves(current, f + suf), f + suf);
     sim.appendChild(b);
   }
-  document.getElementById('btnScramble').onclick = () => {
-    const faces = 'URFDLB', sufs = ['', "'", '2'];
+  const setVirtual = (state, note) => {
+    guide.clear();
+    if (mode === 'timer' && timer.phase === 'running') { cancelRun(); }
+    current = state;
+    if (!replay.active) render(current);
+    renderGuide();
+    $('solveMsg').textContent = note || '';
+    if (mode === 'timer') setMode('timer');
+  };
+  $('btnScramble').onclick = () => {
+    const sufs = ['', "'", '2'];
     let alg = [], last = '';
     while (alg.length < 20) {
-      const f = faces[Math.floor(Math.random() * 6)];
+      const f = FACES[Math.floor(Math.random() * 6)];
       if (f === last) continue;
       last = f; alg.push(f + sufs[Math.floor(Math.random() * 3)]);
     }
     log('virtual scramble: ' + alg.join(' '));
-    clearPlan();
-    current = applyMoves(SOLVED, alg.join(' '));
-    render(current); renderPlan();
-    document.getElementById('solveMsg').textContent = 'Scrambled: ' + alg.join(' ');
+    setVirtual(applyMoves(SOLVED, alg.join(' ')), 'Scrambled: ' + alg.join(' '));
   };
-  document.getElementById('btnReset').onclick = () => { clearPlan(); current = SOLVED; render(current); renderPlan(); };
+  $('btnReset').onclick = () => setVirtual(SOLVED);
   document.addEventListener('keydown', e => {
-    if (e.ctrlKey || e.metaKey || e.altKey || e.target.tagName === 'INPUT') return;
+    if (e.ctrlKey || e.metaKey || e.altKey || ['INPUT', 'SELECT'].includes(e.target.tagName)) return;
     const f = e.key.toUpperCase();
-    if (!'URFDLB'.includes(f) || f.length !== 1) return;
+    if (f.length !== 1 || !FACES.includes(f)) return;
     const m = f + (e.shiftKey ? "'" : '');
     onStateChange(applyMoves(current, m), m);
   });
@@ -649,26 +1144,59 @@ function handlePacket(dv) {
 /* ---------------------------------------------------------------------------
  * Wire up
  * ------------------------------------------------------------------------- */
-document.getElementById('btnConnect').onclick = connect;
-document.getElementById('btnDisconnect').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
-document.getElementById('btnSolve').onclick = () => solveNow();
-document.getElementById('btnMarkSolved').onclick = async () => {
+$('btnConnect').onclick = connect;
+$('btnDisconnect').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
+$('btnSolve').onclick = () => solveNow();
+$('btnMarkSolved').onclick = async () => {
   if (!ctrlWrite) return;
   if (!confirm('Only do this when the physical cube really is solved. Continue?')) return;
   try {
     await ctrlWrite.writeValue(new Uint8Array([0xa1]));
     log('Sent reset (0xA1)');
-    clearPlan();
-    onStateChange(SOLVED, null, true);
+    guide.clear();
+    onStateChange(SOLVED, null);
+    renderGuide();
     if (stateChar) handlePacket(await stateChar.readValue());
   } catch (e) { log('Reset failed: ' + e.message); }
 };
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => setMode(b.dataset.tab));
+$('btnNewScramble').onclick = () => newScramble();
+$('btnAbort').onclick = () => { cancelRun(); renderTimer('Solve cancelled.'); $('timer').textContent = '0.00'; };
+$('history').onclick = e => {
+  const tr = e.target.closest('tr[data-id]');
+  if (!tr) return;
+  selectedId = Number(tr.dataset.id);
+  renderHistory(); renderDetail();
+};
+$('btnReplay').onclick = () => { const s = solves.find(x => x.id === selectedId); if (s) startReplay(s); };
+$('btnCopy').onclick = async () => {
+  const s = solves.find(x => x.id === selectedId);
+  if (!s) return;
+  try { await navigator.clipboard.writeText(reconstruction(s)); $('historyMsg').textContent = 'Reconstruction copied.'; }
+  catch (e) { $('historyMsg').textContent = 'Copy failed: ' + e.message; }
+};
+$('btnDelete').onclick = () => {
+  if (!confirm('Delete this solve?')) return;
+  solves = solves.filter(x => x.id !== selectedId);
+  selectedId = solves.length ? solves[solves.length - 1].id : null;
+  saveSolves(); renderStats(); renderHistory(); renderDetail();
+};
+$('rpPlay').onclick = () => playReplay(!replay.playing);
+$('rpExit').onclick = exitReplay;
+$('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
+
+loadSolves();
+selectedId = solves.length ? solves[solves.length - 1].id : null;
+renderStats(); renderHistory(); renderDetail();
 
 if (typeof Cube === 'undefined') {
   solverStatus('Could not load cubejs from the CDN — check your connection.', true);
 } else {
   render(current);
-  renderPlan();
+  renderGuide();
+  let saved = 'guide';
+  try { saved = localStorage.getItem('micube.tab') || 'guide'; } catch (e) { /* ignore */ }
+  setMode(saved === 'timer' ? 'timer' : 'guide');
   solver.init();
 }
 </script>

@@ -1046,6 +1046,9 @@ async function connect(showAll) {
         { namePrefix: 'Xiaomi' },
         { namePrefix: 'Hi-' },
         { services: [SVC_DATA] },
+        // Some Xiaomi cubes advertise no name at all, only Xiaomi's company ID and FE95 service data.
+        { manufacturerData: [{ companyIdentifier: 0x038f }] },
+        { services: [0xfe95] },
       ],
       optionalServices: [SVC_DATA, SVC_CTRL],
     });

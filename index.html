@@ -50,15 +50,9 @@
   .views { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
   .scene { width: 210px; height: 210px; perspective: 700px; touch-action: none; cursor: grab; flex: none; }
   .cube3d { position: relative; width: 120px; height: 120px; margin: 45px; transform-style: preserve-3d; }
-  .face3d { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px;
-    padding: 3px; background: #111; border-radius: 6px; backface-visibility: hidden; }
-  .face3d div { border-radius: 4px; transition: background-color .12s; }
-  .f-U { transform: rotateX(90deg) translateZ(60px); }
-  .f-D { transform: rotateX(-90deg) translateZ(60px); }
-  .f-F { transform: translateZ(60px); }
-  .f-B { transform: rotateY(180deg) translateZ(60px); }
-  .f-R { transform: rotateY(90deg) translateZ(60px); }
-  .f-L { transform: rotateY(-90deg) translateZ(60px); }
+  .cubie { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; transform-style: preserve-3d; }
+  .pl { position: absolute; inset: 0; background: #111; backface-visibility: hidden; border-radius: 3px; }
+  .pl > div { position: absolute; inset: 2px; border-radius: 5px; }
   .net { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; width: min(100%, 360px); }
   .net div { aspect-ratio: 1; border-radius: 3px; transition: background-color .12s; }
   .net .s { outline: 1px solid rgba(0,0,0,.55); outline-offset: -1px; }
@@ -137,7 +131,7 @@
     <div class="views">
       <div>
         <div class="scene" id="scene"><div class="cube3d" id="cube3d"></div></div>
-        <div class="hint">Drag to rotate</div>
+        <div class="hint">Drag to rotate &middot; <label class="chk" style="font-size:12px"><input type="checkbox" id="animToggle" checked> Animate turns</label></div>
       </div>
       <div class="net" id="net"></div>
     </div>
@@ -458,16 +452,47 @@ const netEl = document.getElementById('net');
 const sticker3d = [];
 const stickerNet = [];
 
+/* The 3D cube is built from 26 cubies so a layer can rotate during a turn animation.
+ * Coordinates: x right, y up, z towards the viewer (CSS y points down, hence -y). */
+const CUBIE = 40;
+const cubies = [];
+const PLANE_T = { U: 'rotateX(90deg)', D: 'rotateX(-90deg)', F: '', B: 'rotateY(180deg)', R: 'rotateY(90deg)', L: 'rotateY(-90deg)' };
+/** Position of the cubie carrying Kociemba facelet i of face f. */
+function faceletPos(f, i) {
+  const r = Math.floor(i / 3), c = i % 3;
+  switch (f) {
+    case 'U': return [c - 1, 1, r - 1];
+    case 'D': return [c - 1, -1, 1 - r];
+    case 'F': return [c - 1, 1 - r, 1];
+    case 'B': return [1 - c, 1 - r, -1];
+    case 'R': return [1, 1 - r, 1 - c];
+    case 'L': return [-1, 1 - r, c - 1];
+  }
+}
 (function buildViews() {
-  for (let fi = 0; fi < 6; fi++) {
-    const face = document.createElement('div');
-    face.className = 'face3d f-' + FACES[fi];
-    for (let i = 0; i < 9; i++) {
-      const s = document.createElement('div');
-      face.appendChild(s);
-      sticker3d[fi * 9 + i] = s;
+  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+    if (!x && !y && !z) continue;
+    const el = document.createElement('div');
+    el.className = 'cubie';
+    const base = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
+    el.style.transform = base;
+    const planes = {};
+    for (const f of FACES) {   // black on all sides so gaps show a solid interior mid-turn
+      const pl = document.createElement('div');
+      pl.className = 'pl';
+      pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
+      el.appendChild(pl);
+      planes[f] = pl;
     }
-    cube3d.appendChild(face);
+    cube3d.appendChild(el);
+    cubies.push({ el, x, y, z, base, planes });
+  }
+  for (let fi = 0; fi < 6; fi++) for (let i = 0; i < 9; i++) {
+    const [x, y, z] = faceletPos(FACES[fi], i);
+    const cb = cubies.find(c => c.x === x && c.y === y && c.z === z);
+    const st = document.createElement('div');
+    cb.planes[FACES[fi]].appendChild(st);
+    sticker3d[fi * 9 + i] = st;
   }
   const origin = { U: [0, 3], L: [3, 0], F: [3, 3], R: [3, 6], B: [3, 9], D: [6, 3] };
   const cells = new Array(108).fill(null);
@@ -482,12 +507,58 @@ const stickerNet = [];
   }
 })();
 
-function render(state) {
-  for (let i = 0; i < 54; i++) {
-    const col = `var(--c${state[i]})`;
-    sticker3d[i].style.backgroundColor = col;
-    stickerNet[i].style.backgroundColor = col;
+function paint3d(state) {
+  for (let i = 0; i < 54; i++) sticker3d[i].style.backgroundColor = `var(--c${state[i]})`;
+}
+
+/* Turn animation: rotate the 9 cubies of the layer, then snap back and repaint with the new state. */
+const LAYER = { U: ['y', 1], D: ['y', -1], R: ['x', 1], L: ['x', -1], F: ['z', 1], B: ['z', -1] };
+const ROT = { U: ['Y', -1], D: ['Y', 1], R: ['X', 1], L: ['X', -1], F: ['Z', 1], B: ['Z', -1] };
+const anim = { queue: [], busy: false, timer: 0, layer: null, enabled: true };
+
+function stopAnim() {
+  clearTimeout(anim.timer);
+  if (anim.layer) for (const c of anim.layer) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
+  anim.layer = null; anim.busy = false; anim.queue.length = 0;
+}
+
+function runAnim() {
+  const item = anim.queue.shift();
+  if (!item) { anim.busy = false; return; }
+  if (anim.queue.length > 4) {           // far behind (very fast turning): jump to the latest state
+    const last = anim.queue[anim.queue.length - 1];
+    anim.queue.length = 0;
+    paint3d(last.s); anim.busy = false; return;
   }
+  anim.busy = true;
+  const m = item.m, [axis, val] = LAYER[m[0]], [rAxis, sign] = ROT[m[0]];
+  const amt = m.endsWith('2') ? 2 : m.endsWith("'") ? -1 : 1;
+  const dur = (amt === 2 ? 1.5 : 1) * (anim.queue.length ? 90 : 170);
+  const layer = cubies.filter(c => c[axis] === val);
+  anim.layer = layer;
+  for (const c of layer) {
+    void c.el.offsetWidth;   // make sure the transition starts from the resting position
+    c.el.style.transition = `transform ${dur}ms ease-out`;
+    c.el.style.transform = `rotate${rAxis}(${sign * amt * 90}deg) ${c.base}`;
+  }
+  anim.timer = setTimeout(() => {
+    for (const c of layer) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
+    anim.layer = null;
+    paint3d(item.s);
+    runAnim();
+  }, dur);
+}
+
+/** Show `state`. If `moves` (from `prev`) is given and animation is on, the 3D cube animates the turns. */
+function render(state, prev, moves) {
+  for (let i = 0; i < 54; i++) stickerNet[i].style.backgroundColor = `var(--c${state[i]})`;
+  if (!anim.enabled || !prev || !moves || !moves.length || moves.includes('?')) {
+    stopAnim(); paint3d(state); return;
+  }
+  let s = prev;
+  for (const m of moves) { s = applyMoves(s, m); anim.queue.push({ m, s }); }
+  if (s !== state) { stopAnim(); paint3d(state); return; }
+  if (!anim.busy) runAnim();
 }
 
 (function setupDrag() {
@@ -962,10 +1033,12 @@ function startReplay(s) {
   $('replayBar').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   playReplay(true);
 }
-function showFrame(i) {
+function showFrame(i, animate) {
+  const prevIdx = replay.idx;
   replay.idx = i;
   const f = replay.frames[i];
-  render(f.s);
+  if (animate && i === prevIdx + 1 && f.m !== '?') render(f.s, replay.frames[prevIdx].s, [f.m]);
+  else render(f.s);
   $('rpSlider').value = i;
   $('replayTime').textContent = `${fmt(f.t)} / ${fmt(replay.frames[replay.frames.length - 1].t)}`;
   $('replayMove').textContent = i ? `Turn ${i} of ${replay.frames.length - 1}: ${f.m}` : 'Scrambled state';
@@ -982,7 +1055,7 @@ function playReplay(on) {
     replay.last = now;
     let i = replay.idx;
     while (i + 1 < replay.frames.length && replay.frames[i + 1].t <= replay.time) i++;
-    if (i !== replay.idx) showFrame(i);
+    if (i !== replay.idx) { if (i === replay.idx + 1) showFrame(i, true); else showFrame(i); }
     if (i >= replay.frames.length - 1) { playReplay(false); return; }
     replay.raf = requestAnimationFrame(loop);
   };
@@ -1002,14 +1075,10 @@ function onStateChange(state, move) {
   if (state === current) return;
   const prev = current;
   current = state;
-  if (!replay.active) render(current);
-  if (mode === 'timer') {
-    let moves = move && applyMoves(prev, move) === state ? [move] : null;
-    if (!moves && timer.phase === 'running') moves = findMoves(prev, state) || ['?'];
-    timerOnState(prev, moves || []);
-  } else {
-    guideOnState(move);
-  }
+  const moves = move && applyMoves(prev, move) === state ? [move] : findMoves(prev, state);
+  if (!replay.active) render(current, prev, moves);
+  if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
+  else guideOnState(move || (moves && moves[0]));
 }
 
 function onSolverReady() {
@@ -1253,6 +1322,14 @@ function applyColors() {
   $('btnColorClassic').onclick = preset(CLASSIC_COLORS, true);
   applyColors();
 })();
+
+try { anim.enabled = localStorage.getItem('micube.anim') !== 'off'; } catch (e) { /* ignore */ }
+$('animToggle').checked = anim.enabled;
+$('animToggle').onchange = e => {
+  anim.enabled = e.target.checked;
+  if (!anim.enabled) { stopAnim(); paint3d(replay.active ? replay.frames[replay.idx].s : current); }
+  try { localStorage.setItem('micube.anim', anim.enabled ? 'on' : 'off'); } catch (err) { /* ignore */ }
+};
 
 loadSolves();
 selectedId = solves.length ? solves[solves.length - 1].id : null;

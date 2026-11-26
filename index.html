@@ -110,6 +110,36 @@
     background: none; cursor: pointer; flex: none; }
   .sw { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -1px;
     outline: 1px solid rgba(255,255,255,.25); margin-right: 4px; }
+  /* Algorithms tab */
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; background: none; padding: 6px 16px; color: var(--muted); font-weight: 600; }
+  .seg button.active { background: var(--accent); color: #fff; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px; color: var(--muted); }
+  .legend span::before, .st-dot::before { content: ''; display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+    margin-right: 5px; background: var(--stc, var(--muted)); }
+  .st-learned { --stc: var(--ok); } .st-learning { --stc: var(--warn); } .st-notknown { --stc: var(--bad); } .st-unseen { --stc: #5b6270; }
+  .trainer { background: var(--panel2); border-radius: 10px; padding: 12px; margin-top: 12px; }
+  .trainer select { padding: 4px 8px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 10px 14px; margin-top: 10px; font-size: 14px; color: var(--muted); align-items: center; }
+  .tr-case { display: flex; gap: 14px; align-items: center; margin-top: 12px; }
+  .tr-name { font-size: 20px; font-weight: 700; }
+  .tr-alg { font: 600 15px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; margin-top: 4px; cursor: pointer; }
+  .tr-alg.hid { color: var(--muted); font-family: inherit; font-weight: 400; }
+  .diag { display: grid; grid-template-columns: 1.5fr 4fr 4fr 4fr 1.5fr; grid-template-rows: 1.5fr 4fr 4fr 4fr 1.5fr; gap: 2px;
+    width: 64px; height: 64px; flex: none; }
+  .diag.big { width: 96px; height: 96px; }
+  .diag div { border-radius: 2px; }
+  .cases { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+  .case-card { background: var(--panel2); border: 1px solid var(--line); border-left: 4px solid var(--stc, var(--line));
+    border-radius: 8px; padding: 8px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer;
+    font: inherit; color: inherit; text-align: center; }
+  .case-card.sel { border-color: var(--accent); }
+  .case-card .nm { font-size: 13px; font-weight: 600; line-height: 1.2; }
+  .case-card .sm { font-size: 11px; color: var(--muted); }
+  .case-detail { background: var(--panel2); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .alg-opt { display: flex; gap: 8px; align-items: baseline; padding: 4px 0;
+    font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .ll-tag { font-size: 12px; color: var(--muted); }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
 </style>
@@ -182,6 +212,7 @@
     <div class="tabs">
       <button data-tab="guide" class="active">Guided solve</button>
       <button data-tab="timer">Timer &amp; stats</button>
+      <button data-tab="train">Algorithms</button>
     </div>
     <div id="solverStatus" class="msg" style="margin-top:0">Loading solver&hellip;</div>
 
@@ -247,6 +278,61 @@
       <h3>History</h3>
       <div class="history"><table id="history"></table></div>
       <div class="msg" id="historyMsg"></div>
+    </div>
+
+    <!-- Algorithms: trainer + memorisation tracking -->
+    <div id="tab-train" class="hidden">
+      <div class="row" style="justify-content:space-between">
+        <div class="seg" id="setSeg"><button data-set="oll" class="active">OLL</button><button data-set="pll">PLL</button></div>
+        <div class="legend" id="legend"></div>
+      </div>
+
+      <div class="trainer">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0">Trainer</h3>
+          <div class="row">
+            <button id="btnSkip" class="hidden">Skip case</button>
+            <button class="primary" id="btnTrain" disabled>Start training</button>
+          </div>
+        </div>
+        <div class="opts">
+          <label>Cases <select id="trPick"><option value="smart">Not learned first</option><option value="all">All cases</option><option value="star">Starred only</option></select></label>
+          <label>Hold <select id="trTop"><option value="yellow">Yellow on top</option><option value="white">White on top</option></select></label>
+          <label class="chk"><input type="checkbox" id="trHide"> Hide algorithm</label>
+        </div>
+        <div id="trActive" class="hidden">
+          <div class="tr-case">
+            <div class="diag big" id="trDiag"></div>
+            <div style="min-width:0">
+              <div class="tr-name" id="trName"></div>
+              <div class="tr-alg" id="trAlg"></div>
+            </div>
+          </div>
+          <div id="trSetup" style="margin-top:10px">
+            <div class="next" style="margin-bottom:8px">
+              <div class="mv" id="tNext" style="font-size:40px">&ndash;</div>
+              <div class="sub" id="tSub"></div>
+            </div>
+            <div class="moves" id="tMoves"></div>
+            <div class="bar"><div id="tProg"></div></div>
+            <div class="msg" id="tProgText"></div>
+          </div>
+          <div class="timer" id="trTimer">0.00</div>
+          <div class="timer-note" id="trNote"></div>
+        </div>
+      </div>
+
+      <h3>Cases</h3>
+      <div id="caseDetail" class="case-detail hidden"></div>
+      <div class="cases" id="caseGrid"></div>
+      <div class="msg">
+        <strong>How status works:</strong> every time you meet a case — in the trainer or in a timed solve — it counts as
+        <em>one-look</em> if you did it without a pause over 1 s and in at most the algorithm's turns + 4.
+        <span class="st-dot st-learned">Learned</span>: your last 3 attempts were one-look.
+        <span class="st-dot st-learning">Learning</span>: at least one of your last 5 was.
+        <span class="st-dot st-notknown">Not known</span>: none of them were.
+      </div>
+      <div class="msg">Algorithms from SpeedCubeDB via the MIT-licensed <code>@moishy/algsets</code> package, each verified by this app.</div>
     </div>
   </section>
 </main>
@@ -443,6 +529,113 @@ function analyzeSolve(states, times) {
   });
   return { crossFace: X, phases };
 }
+
+/* ---------------------------------------------------------------------------
+ * OLL / PLL algorithm database and case recognition.
+ * Case data: SpeedCubeDB algorithms via the MIT-licensed @moishy/algsets package (Copyright (c) 2026
+ * Moshe Rosenberg). Every algorithm was checked to keep F2L intact and to solve the same case as the
+ * case's primary algorithm; a case is identified by the state its primary algorithm solves.
+ * ------------------------------------------------------------------------- */
+const ALG_DATA = {"oll":[{"id":"oll-1","name":"OLL 1","subset":"dot","algs":["R U2 R' R' F R F' U2 R' F R F'","R U2 R2 F R F' U2 R' F R F'","U R U' R2 D' r U' r' D R2 U R'","f R U R' U' R f' U' r' U' R U M'"]},{"id":"oll-2","name":"OLL 2","subset":"dot","algs":["f U R U' R' f' F U R U' R' F'","F R U R' U' F' f R U R' U' f'","U' R U' R2 D' r U r' D R2 U R'","F R U R' U' S R U R' U' f'"]},{"id":"oll-3","name":"OLL 3","subset":"dot","algs":["U' f R U R' U' f' U' F R U R' U' F'","U R' F2 R2 U2 R' F R U2 R2 F2 R","r' R2 U R' U r U2 r' U M'","M R U R' U r U2 r' U M'"]},{"id":"oll-4","name":"OLL 4","subset":"dot","algs":["U' f R U R' U' f' U F R U R' U' F'","U' R' F2 R2 U2 R' F' R U2 R2 F2 R","R' F R F' U' S R' U' R U R S'","U F U R U' R' F' U' F R U R' U' F'"]},{"id":"oll-5","name":"OLL 5","subset":"square","algs":["r' U2 R U R' U r","U2 l' U2 L U L' U l","U2 R' F2 r U r' F R","U2 R' F2 L F L' F R"]},{"id":"oll-6","name":"OLL 6","subset":"square","algs":["r U2 R' U' R U' r'","F U' R2 D R' U' R D' R2 U F'","U2 l U2 L' U' L U' l'","U' x' D R2 U' R' U R' D' x"]},{"id":"oll-7","name":"OLL 7","subset":"lightning-bolt","algs":["r U R' U R U2 r'","S' R U R' U R U2 R' U S","L' U2 L U2 L F' L' F","U2 l U L' U L U2 l'"]},{"id":"oll-8","name":"OLL 8","subset":"lightning-bolt","algs":["U2 r' U' R U' R' U2 r","l' U' L U' L' U2 l","R U2 R' U2 R' F R F'","R' F' r U' r' F2 R"]},{"id":"oll-9","name":"OLL 9","subset":"fish-shape","algs":["U R U R' U' R' F R R U R' U' F'","U R U R' U' R' F R2 U R' U' F'","R U2 R' U' S' R U' R' S","U2 F' U' F r U' r' U r U r'"]},{"id":"oll-10","name":"OLL 10","subset":"fish-shape","algs":["R U R' U R' F R F' R U2 R'","U F U F' R' F R U' R' F' R","U M' R' U2 R U R' U R U M","U2 L' U' L U L F' L2 U' L U F"]},{"id":"oll-11","name":"OLL 11","subset":"lightning-bolt","algs":["M R U R' U R U2 R' U M'","r' R2 U R' U R U2 R' U M'","U2 r U R' U R' F R F' R U2 r'","S R U R' U R U2 R' U2 S'"]},{"id":"oll-12","name":"OLL 12","subset":"lightning-bolt","algs":["U' M' R' U' R U' R' U2 R U' M","F R U R' U' F' U F R U R' U' F'","U' S R' U' R U' R' U2 R U2 S'","U M L' U' L U' L' U2 L U' M'"]},{"id":"oll-13","name":"OLL 13","subset":"knight-shape","algs":["r U' r' U' r U r' F' U F","F U R U2 R' U' R U R' F'","F U R U' R2 F' R U R U' R'","U2 f R U R2 U' R' U R U' f'"]},{"id":"oll-14","name":"OLL 14","subset":"knight-shape","algs":["R' F R U R' F' R F U' F'","r U R' U' r' F R2 U R' U' F'","l' U l U l' U' l F U' F'","F' U' L' U L2 F L' U' L' U L"]},{"id":"oll-15","name":"OLL 15","subset":"knight-shape","algs":["r' U' r R' U' R U r' U r","U2 l' U' l L' U' L U l' U l","r' U' M' U' R U r' U r","U2 R' F' R L' U' L U R' F R"]},{"id":"oll-16","name":"OLL 16","subset":"knight-shape","algs":["r U r' R U R' U' r U' r'","r U M U R' U' r U' r'","U2 R' F R U R' U' F' R U' R' U2 R","U2 l U l' L U L' U' l U' l'"]},{"id":"oll-17","name":"OLL 17","subset":"dot","algs":["R U R' U R' F R F' U2 R' F R F'","U2 F R' F' R U S' R U' R' S","U2 F R' F' R2 r' U R U' R' U' M'","U' F' r U r' U' S r' F r S'"]},{"id":"oll-18","name":"OLL 18","subset":"dot","algs":["U R U2 R' R' F R F' U2 M' U R U' r'","U R U2 R2 F R F' U2 M' U R U' r'","r U R' U R U2 r2 U' R U' R' U2 r","U F S' R U' R' S R U2 R' U' F'"]},{"id":"oll-19","name":"OLL 19","subset":"dot","algs":["M U R U R' U' M' R' F R F'","U S' R U R' S U' R' F R F'","R' U2 F R U R' U' F2 U2 F R","r' R U R U R' U' r R2 F R F'"]},{"id":"oll-20","name":"OLL 20","subset":"dot","algs":["r U R' U' M2 U R U' R' U' M'","r U R' U' M2 U R U' R' U' M'","M' U2 M U2 M' U M U2 M' U2 M","S' R U R' S U' M' U R U' r'"]},{"id":"oll-21","name":"OLL 21","subset":"cross","algs":["R U R' U R U' R' U R U2 R'","R U R' U R U' R' U R U2 R'","U R U2 R' U' R U R' U' R U' R'","U F R U R' U' R U R' U' R U R' U' F'"]},{"id":"oll-22","name":"OLL 22","subset":"cross","algs":["R' U2 R2 U R2 U R2 U2 R'","R U2 R2 U' R2 U' R2 U' U' R","R U2 R2 U' R2 U' R2 U2 R","R' U2 R2 U R2 U R2 U2 R'"]},{"id":"oll-23","name":"OLL 23","subset":"cross","algs":["R2 D R' U2 R D' R' U2 R'","U2 R2 D' R U2 R' D R U2 R","R U R' U R U2 R2 U' R U' R' U2 R","U R U R' U' R U' R' U2 R U' R' U2 R U R'"]},{"id":"oll-24","name":"OLL 24","subset":"cross","algs":["r U R' U' r' F R F'","U2 R' F' r U R U' r' F","U' x' R U R' D R U' R' D' x","U R U R D R' U' R D' R2"]},{"id":"oll-25","name":"OLL 25","subset":"cross","algs":["U F' r U R' U' r' F R","R U2 R D R' U2 R D' R2","F R' F' r U R U' r'","x R' U R D' R' U' R D x'"]},{"id":"oll-26","name":"OLL 26","subset":"cross","algs":["U R U2 R' U' R U' R'","R' U' R U' R' U2 R","U2 L' U' L U' L' U2 L","U2 L' U R U' L U R'"]},{"id":"oll-27","name":"OLL 27","subset":"cross","algs":["R U R' U R U2 R'","U' R' U2 R U R' U R","U L' U2 L U L' U L","U2 L U L' U L U2 L'"]},{"id":"oll-28","name":"OLL 28","subset":"corners-oriented","algs":["r U R' U' M U R U' R'","R' F R S R' F' R S'","r U R' U' r' R U R U' R'","U2 M' U M U2 M' U M"]},{"id":"oll-29","name":"OLL 29","subset":"awkward-shape","algs":["U R U R' U' R U' R' F' U' F R U R'","r2 D' r U r' D r2 U' r' U' r","U S' R U R' U' R' F R F' U S","M U R U R' U' R' F R F' M'"]},{"id":"oll-30","name":"OLL 30","subset":"awkward-shape","algs":["U2 F U R U2 R' U' R U2 R' U' F'","U' r' D' r U' r' D r2 U' r' U r U r'","U2 F R' F R2 U' R' U' R U R' F2","U S' R' U' R f R' U R U' F'"]},{"id":"oll-31","name":"OLL 31","subset":"p-shape","algs":["R' U' F U R U' R' F' R","U2 S' L' U' L U L F' L' f","U S R U R' U' f' U' F","U' F R' F' R U R U R' U' R U' R'"]},{"id":"oll-32","name":"OLL 32","subset":"p-shape","algs":["S R U R' U' R' F R f'","U2 L U F' U' L' U L F L'","R U B' U' R' U R B R'","U' R' F R F' U' r U' r' U r U r'"]},{"id":"oll-33","name":"OLL 33","subset":"t-shape","algs":["R U R' U' R' F R F'","U2 L' U' L U L F' L' F","U2 r' F' r U r U' r' F","R U R' F' U' F R U' R'"]},{"id":"oll-34","name":"OLL 34","subset":"c-shape","algs":["U2 R U R2 U' R' F R U R U' F'","U f R f' U' r' U' R U M'","F R U R' U' R' F' r U R U' r'","U2 R U R' U' B' R' F R F' B"]},{"id":"oll-35","name":"OLL 35","subset":"fish-shape","algs":["R U2 R' R' F R F' R U2 R'","R U2 R2 F R F' R U2 R'","f R U R' U' f' R U R' U R U2 R'","R U2 R' d' R' F R U' R' F' R"]},{"id":"oll-36","name":"OLL 36","subset":"w-shape","algs":["U2 L' U' L U' L' U L U L F' L' F","U R U R2 F' U' F U R2 U2 R'","U2 R U R' F' R U R' U' R' F R U' R' F R F'","U2 R' F' U' F2 U R U' R' F' R"]},{"id":"oll-37","name":"OLL 37","subset":"fish-shape","algs":["F R U' R' U' R U R' F'","F R' F' R U R U' R'","U F' r U r' U' r' F r","U2 r2 D' r U' r' D r U r"]},{"id":"oll-38","name":"OLL 38","subset":"w-shape","algs":["R U R' U R U' R' U' R' F R F'","U F R U' R' S U' R U R' f'","r U R' U' r' F R U R U' R' F'","U2 L U L' U L U' L' U' L' B L B'"]},{"id":"oll-39","name":"OLL 39","subset":"lightning-bolt","algs":["U L F' L' U' L U F U' L'","U' f' r U r' U' r' F r S","U' R U R' F' U' F U R U2 R'","U' f' L F L' U' L' U L S"]},{"id":"oll-40","name":"OLL 40","subset":"lightning-bolt","algs":["U R' F R U R' U' F' U R","U' f R' F' R U R U' R' S'","R r D r' U r D' r' U' R'","U' L' U' L F U F' U' L' U2 L"]},{"id":"oll-41","name":"OLL 41","subset":"awkward-shape","algs":["U2 R U R' U R U2 R' F R U R' U' F'","U2 F U R2 D R' U' R D' R2 F'","U' S U' R' F' U' F U R S'","M U' F' L' U' L U F M'"]},{"id":"oll-42","name":"OLL 42","subset":"awkward-shape","algs":["R' U' R U' R' U2 R F R U R' U' F'","U F S' R U R' U' F' U S","U R' F R F' R' F R F' R U R' U' R U R'","U F R' F' R U2 R' U' R2 U' R2 U2 R"]},{"id":"oll-43","name":"OLL 43","subset":"p-shape","algs":["U R' U' F' U F R","U2 F' U' L' U L F","f' L' U' L U f","B' U' R' U R B"]},{"id":"oll-44","name":"OLL 44","subset":"p-shape","algs":["f R U R' U' f'","U2 F U R U' R' F'","U R U B U' B' R'","U' L U F U' F' L'"]},{"id":"oll-45","name":"OLL 45","subset":"t-shape","algs":["F R U R' U' F'","U R' F' U' F U R","U2 f U R U' R' f'","U2 F' L' U' L U F"]},{"id":"oll-46","name":"OLL 46","subset":"c-shape","algs":["R' U' R' F R F' U R","R' F' U' F R U' R' U2 R","U F R U R' U' F' U' R U R' U R U2 R'","l' U2 L2 F' L' F U L' U l"]},{"id":"oll-47","name":"OLL 47","subset":"l-shape","algs":["F' L' U' L U L' U' L U F","U' F R' F' R U2 R U' R' U R U2 R'","R' U' R' F R F' R' F R F' U R","U' R' F' U' F U F' U' F U R"]},{"id":"oll-48","name":"OLL 48","subset":"l-shape","algs":["F R U R' U' R U R' U' F'","U2 f U R U' R' U R U' R' f'","R U2 R' U' R U R' U2 R' F R F'","F R' F' U2 R U R' U R2 U2 R'"]},{"id":"oll-49","name":"OLL 49","subset":"l-shape","algs":["U2 r U' r2 U r2 U r2 U' r","l U' l2 U l2 U l2 U' l","R B' R2 F R2 B R2 F' R","U2 R' F R' F' R2 U2 B' R B R'"]},{"id":"oll-50","name":"OLL 50","subset":"l-shape","algs":["r' U r2 U' r2 U' r2 U r'","U2 R' F R2 B' R2 F' R2 B R'","U' R U2 R' U' R U' R' F R U R' U' F'","U2 l' U l2 U' l2 U' l2 U l'"]},{"id":"oll-51","name":"OLL 51","subset":"i-shape","algs":["f R U R' U' R U R' U' f'","U2 F U R U' R' U R U' R' F'","U' R' U' R' F R F' R U' R' U2 R","U r' F' U' F U F' U' F U r"]},{"id":"oll-52","name":"OLL 52","subset":"i-shape","algs":["F R U R' d R' U' R U' R'","U2 R' F' U' F U' R U R' U R","R U R' U R U' B U' B' R'","R U R' U R d' R U' R' F'"]},{"id":"oll-53","name":"OLL 53","subset":"l-shape","algs":["r' U2 R U R' U' R U R' U r","r' U' R U' R' U R U' R' U2 r","U2 l' U' L U' L' U L U' L' U2 l","U r' U2 R U R' U' R U R' U r"]},{"id":"oll-54","name":"OLL 54","subset":"l-shape","algs":["r U2 R' U' R U R' U' R U' r'","r U R' U R U' R' U R U2 r'","U' r U2 R' U' R U R' U' R U' r'","U' r U r' R U R' U' R U R' U' r U' r'"]},{"id":"oll-55","name":"OLL 55","subset":"i-shape","algs":["R U2 R2 U' R U' R' U2 F R F'","U R' F U R U' R2 F' R2 U R' U' R","U R' F R U R U' R2 F' R2 U' R' U R U R'","r U2 R2 F R F' U2 r' F R F'"]},{"id":"oll-56","name":"OLL 56","subset":"i-shape","algs":["r U r' U R U' R' U R U' R' r U' r'","r U r' U R U' R' M' U R U2 r'","F R U R' U' R F' r U R' U' r'","r' U' r U' R' U R U' R' U R r' U r"]},{"id":"oll-57","name":"OLL 57","subset":"corners-oriented","algs":["R U R' U' M' U R U' r'","U R U' R' S' R U R' S","U R U R' S' R U' R' S","R U R' U' R' r U R U' r'"]}],"pll":[{"id":"aa","name":"Aa Permutation","subset":"edge-swap","algs":["x R2 D2 R U R' D2 R U' R x'","x R2 D2 R U R' D2 R U' R x'","U x' R U' R D2 R' U R D2 R2 x","R' B' R U' R D R' U R D' R2 B R"]},{"id":"ab","name":"Ab Permutation","subset":"edge-swap","algs":["x R' U R' D2 R U' R' D2 R2 x'","x R' U R' D2 R U' R' D2 R2 x'","U x' R2 D2 R' U' R D2 R' U R' x","l' U R' D2 R U' R' D2 R2 x'"]},{"id":"e","name":"E Permutation","subset":"edge-swap","algs":["x' D R U R' D' R U' R' D R U' R' D' R U R' x","U x' R U' R' D R U R' D' R U R' D R U' R' D' x","U R' U' R' D' R U' R' D R U R' D' R U R' D R2","R2 U F' R' U R U' R' U R U' R' U R U' F U' R2"]},{"id":"f","name":"F Permutation","subset":"adjacent-swap","algs":["R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R","R' U' R U' R' U R U R2 F' R U R U' R' F U R","U R' U' F' R U R' U' R' F R2 U' R' U' R U R' U R","U R' F R f' R' F R2 U R' U' R' F' R2 U R' S"]},{"id":"ga","name":"Ga Permutation","subset":"adjacent-swap","algs":["R' U' R D' U R2 U R' U R U' R U' R2 D","R' U' R U D' R2 U R' U R U' R U' R2 D","D R' U' R U D' R2 U R' U R U' R U' R2","U F' U' F R2 u R' U R U' R u' R2"]},{"id":"gb","name":"Gb Permutation","subset":"adjacent-swap","algs":["R2 U R' U R' U' R U' R2 D U' R' U R D'","R2 U R' U R' U' R U' R2 D U' R' U R D'","R2 u R' U R' U' R u' R2 F' U F","U R U R' F' R U R' U' R' F R U' R' F R2 U' R' U' R U R' F'"]},{"id":"gc","name":"Gc Permutation","subset":"adjacent-swap","algs":["D' R U R' U' D R2 U' R U' R' U R' U R2","R U R' U' D R2 U' R U' R' U R' U R2 D'","D' R U R' U' D R2 U' R U' R' U R' U R2","R U R' y' R2 u' R U' R' U R' u R2"]},{"id":"gd","name":"Gd Permutation","subset":"adjacent-swap","algs":["R2 U' R U' R U R' U R2 D' U R U' R' D","R2 U' R U' R U R' U R2 D' U R U' R' D","U2 R2 F2 R U2 R U2 R' F R U R' U' R' F R2","D R2 U' R U' R U R' U R2 D' U R U' R'"]},{"id":"h","name":"H Permutation","subset":"epll","algs":["M2 U M2 U2 M2 U M2","M2 U M2 U2 M2 U M2","M2 U' M2 U2 M2 U' M2","M2 U' M2 U2 M2 U' M2"]},{"id":"ja","name":"Ja Permutation","subset":"adjacent-swap","algs":["L' R' U2 R U R' U2 L U' R","U R' U L' U2 R U' R' U2 R L","U2 x R2 F R F' R U2 r' U r U2 x'","L' U' L F L' U' L U L F' L2 U L"]},{"id":"jb","name":"Jb Permutation","subset":"adjacent-swap","algs":["R U R2 F' R U R U' R' F R U' R'","R U R' F' R U R' U' R' F R2 U' R'","R U2 R' U' R U2 L' U R' U' L","r' F R F' r U2 R' U R U2 R'"]},{"id":"na","name":"Na Permutation","subset":"diagonal-swap","algs":["R U R' U2 R U R2 F' R U R U' R' F R U' R' U' R U' R'","R U R' U R U R' F' R U R' U' R' F R2 U' R' U2 R U' R'","F' R U R' U' R' F R2 F U' R' U' R U F' R'","R F U' R' U R U F' R2 F' R U R U' R' F"]},{"id":"nb","name":"Nb Permutation","subset":"diagonal-swap","algs":["F r' F' r U r U' r2 D' F r U r' F' D r","R' U R U' R' F' U' F R U R' F R' F' R U' R","r' D' F r U' r' F' D r2 U r' U' r' F r F'","R' U L' U2 R U' L R' U L' U2 R U' L"]},{"id":"ra","name":"Ra Permutation","subset":"adjacent-swap","algs":["R U2 R D R' U R D' R' U' R' U R U R'","U R U' R' U' R U R D R' U' R D' R' U2 R'","U R U R' F' R U2 R' U2 R' F R U R U2 R'","L U2 L' U2 L F' L' U' L U L F L2"]},{"id":"rb","name":"Rb Permutation","subset":"adjacent-swap","algs":["R' U R U R' U' R' D' R U R' D R U2 R","R' U2 R U2 R' F R U R' U' R' F' R2","U R2 F R U R U' R' F' R U2 R' U2 R","R' U2 R' D' R U' R' D R U R U' R' U' R"]},{"id":"t","name":"T Permutation","subset":"adjacent-swap","algs":["R U R' U' R' F R2 U' R' U' R U R' F'","F R U' R' U R U R2 F' R U R U' R'","R U R' U' R' F R2 U' R' U F' L' U L","R2 u R2 u' R2 F2 u' F2 u F2"]},{"id":"ua","name":"Ua Permutation","subset":"epll","algs":["M2 U' M' U2 M U' M2","U2 M2 U' M U2 M' U' M2","R' U R' U' R' U' R' U R U R2","U2 R2 U R U R' U' R' U' R' U R'"]},{"id":"ub","name":"Ub Permutation","subset":"epll","algs":["M2 U M' U2 M U M2","U2 M2 U M U2 M' U M2","R U R' U R' U' R2 U' R' U R' U R","U R2 U' S' U2 S U' R2"]},{"id":"v","name":"V Permutation","subset":"diagonal-swap","algs":["D2 R' U R D' R2 U' R' U R' U R' D' R U2 R'","R' U R' U' R D' R' D R' U D' R2 U' R2 D R2","R' U R U' R' f' U' R U2 R' U' R U' R' f R","U R U' R U R' D R D' R U' D R2 U R2 D' R2"]},{"id":"y","name":"Y Permutation","subset":"diagonal-swap","algs":["F R' F' R U R U' R' F R U' R' U R U R' F'","F R U' R' U' R U R' F' R U R' U' R' F R F'","F R' F R2 U' R' U' R U R' F' R U R' U' F'","R2 U' R2 U' R2 U F U F' R2 F U' F'"]},{"id":"z","name":"Z Permutation","subset":"epll","algs":["M U2 M2 U2 M U' M2 U' M2","M2 U M2 U M' U2 M2 U2 M'","M' U' M2 U' M2 U' M' U2 M2","U M2 U' M2 U' M' U2 M2 U2 M'"]}]};
+const NICKNAMES = { 'oll-21': 'H', 'oll-22': 'Pi', 'oll-23': 'Headlights', 'oll-24': 'Chameleon', 'oll-25': 'Bowtie',
+  'oll-26': 'Antisune', 'oll-27': 'Sune', 'oll-44': 'P', 'oll-45': 'T' };
+const ORIENTS = [];
+for (const a of ['', 'x', 'x2', "x'", 'z', "z'"]) for (const b of ['', 'y', 'y2', "y'"]) ORIENTS.push((a + ' ' + b).trim());
+const AUF = ['', 'U', 'U2', "U'"];
+const U_LAYER = [0, 1, 2, 3, 4, 5, 6, 7, 8, 18, 19, 20, 9, 10, 11, 45, 46, 47, 36, 37, 38];
+const SIDE_ROWS = [[18, 19, 20], [9, 10, 11], [45, 46, 47], [36, 37, 38]];   // F R B L, top rows
+const TO_D = { D: '', U: 'x2', F: "x'", B: 'x', R: 'z', L: "z'" };           // rotation that brings a face to the bottom
+const centersStd = s => [4, 13, 22, 31, 40, 49].every((i, k) => s[i] === FACES[k]);
+const normAlg = a => a.replace(/2'/g, '2').replace(/\s+/g, ' ').trim();
+
+/** The rotation (from ORIENTS) that brings the centres back to standard after `alg` is applied to a solved cube. */
+function reorientFor(alg) {
+  const c = new Cube(); c.move(alg);
+  for (const r of ORIENTS) { const d = c.clone(); if (r) d.move(r); if (centersStd(d.asString())) return r; }
+  return '';
+}
+/** Solved cube after `alg`, re-oriented to standard centres. */
+function stateAfter(alg) { const r = reorientFor(alg); return applyMoves(SOLVED, (alg + ' ' + r).trim()); }
+/** Rotate a whole state and relabel colours so the centres read standard again. */
+function rotateState(s, rot) {
+  if (!rot) return s;
+  const c = Cube.fromString(s); c.move(rot);
+  const t = c.asString(), map = {};
+  for (let k = 0; k < 6; k++) map[t[k * 9 + 4]] = FACES[k];
+  return t.split('').map(ch => map[ch]).join('');
+}
+function ollSig(s) {
+  return AUF.map(a => { const t = a ? applyMoves(s, a) : s; return U_LAYER.map(i => t[i] === 'U' ? 1 : 0).join(''); }).sort()[0];
+}
+function pllSig(s) {
+  const out = [];
+  for (const a of AUF) {
+    const t = a ? applyMoves(s, a) : s;
+    const v = SIDE_ROWS.flatMap((ps, k) => ps.map(p => ('FRBL'.indexOf(t[p]) - k + 4) % 4));
+    for (let c = 0; c < 4; c++) out.push(v.map(x => (x + c) % 4).join(''));
+  }
+  return out.sort()[0];
+}
+/** Turns a smart cube registers for an alg: rotations are invisible, slice moves show up as two face turns. */
+function algTurns(a) {
+  let n = 0;
+  for (const t of splitAlg(normAlg(a))) {
+    if ('xyz'.includes(t[0])) continue;
+    n += ('MES'.includes(t[0]) ? 2 : 1) * (t.includes('2') ? 2 : 1);
+  }
+  return n;
+}
+const CASES = { oll: [], pll: [] };
+const CASE_BY_ID = new Map();
+const SIG_INDEX = { oll: new Map(), pll: new Map() };
+let SOLVED_SIG = {};
+function buildCases() {
+  for (const set of ['oll', 'pll']) {
+    for (const d of ALG_DATA[set]) {
+      const algs = d.algs.map(normAlg);
+      const state = stateAfter(invertAlg(algs[0]));          // LL on top (U), F2L on the bottom
+      const sig = set === 'oll' ? ollSig(state) : pllSig(state);
+      const c = { ...d, set, algs, state, sig, nick: NICKNAMES[d.id] || '', turns: Math.min(...algs.map(algTurns)) };
+      CASES[set].push(c); CASE_BY_ID.set(c.id, c); SIG_INDEX[set].set(sig, c.id);
+    }
+  }
+  SOLVED_SIG = { oll: ollSig(SOLVED), pll: pllSig(SOLVED) };
+}
+const caseLabel = c => c.name.replace(' Permutation', '-perm') + (c.nick ? ` · ${c.nick}` : '');
+/** Which OLL/PLL case is `state` in, given the cross is on `crossFace`? Returns an id, 'skip', or null. */
+function recognize(set, state, crossFace) {
+  const s = rotateState(state, TO_D[crossFace]);
+  const sig = set === 'oll' ? ollSig(s) : pllSig(s);
+  if (sig === SOLVED_SIG[set]) return 'skip';
+  return SIG_INDEX[set].get(sig) || null;
+}
+/** One-look = no pause over 1 s once started, and not many more turns than the algorithm. */
+function judgeLook(c, turns, gaps) {
+  const maxGap = gaps.length ? Math.max(...gaps) : 0;
+  return turns <= c.turns + 4 && maxGap < 1000;
+}
+
+/* Memorisation progress per case, stored on this device. */
+const PROG_KEY = 'micube.cases.v1';
+let prog = {};
+try { prog = JSON.parse(localStorage.getItem(PROG_KEY) || '{}') || {}; } catch (e) { prog = {}; }
+const saveProg = () => { try { localStorage.setItem(PROG_KEY, JSON.stringify(prog)); } catch (e) { /* ignore */ } };
+const progOf = id => (prog[id] = prog[id] || { ev: [] });
+function addCaseEvent(id, ev) {
+  const p = progOf(id);
+  p.ev.push(ev);
+  if (p.ev.length > 40) p.ev.splice(0, p.ev.length - 40);
+  saveProg();
+}
+function caseStatus(id) {
+  const ev = (prog[id] && prog[id].ev) || [];
+  if (!ev.length) return 'unseen';
+  const last3 = ev.slice(-3);
+  if (last3.length === 3 && last3.every(e => e.ok)) return 'learned';
+  return ev.slice(-5).some(e => e.ok) ? 'learning' : 'notknown';
+}
+const STATUS_TEXT = { learned: 'Learned', learning: 'Learning', notknown: 'Not known', unseen: 'Not practised' };
+const prefAlg = c => c.algs[(prog[c.id] && prog[c.id].pref) || 0] || c.algs[0];
 
 /* ---------------------------------------------------------------------------
  * Rendering: 3D CSS cube + 2D net
@@ -674,7 +867,8 @@ const solver = {
 /** Moves that take `from` to the solved state (targetAlg empty) or to the state `targetAlg` produces from solved. */
 async function pathTo(from, targetAlg) {
   if (!targetAlg) return from === SOLVED ? [] : splitAlg(await solver.solve(from));
-  if (from === SOLVED) return splitAlg(targetAlg);
+  // Shortcut only for plain face turns; rotations / wide / slice moves need real face turns from the solver.
+  if (from === SOLVED && splitAlg(targetAlg).every(m => /^[URFDLB]['2]?$/.test(m))) return splitAlg(targetAlg);
   // We need m with from·m = T, i.e. solve Y = T⁻¹·from.
   const y = new Cube();
   y.move(invertAlg(targetAlg));
@@ -901,8 +1095,19 @@ function finishSolve(total) {
   const solve = {
     id: Date.now(), date: new Date().toISOString(), time: total,
     scramble: timer.scramble, start: timer.states[0], moves: timer.rec,
-    crossFace: analysis.crossFace, phases: analysis.phases,
+    crossFace: analysis.crossFace, phases: analysis.phases, ll: {},
   };
+  // Recognise the OLL and PLL cases you got and whether you did them as one memorised algorithm.
+  for (const [set, p] of [['oll', analysis.phases[5]], ['pll', analysis.phases[6]]]) {
+    const id = recognize(set, timer.states[p.a], analysis.crossFace);
+    if (!id) continue;
+    if (id === 'skip') { solve.ll[set] = { id }; continue; }
+    const gaps = [];
+    for (let k = p.a + 1; k < p.b; k++) gaps.push(timer.rec[k].t - timer.rec[k - 1].t);
+    const ok = judgeLook(CASE_BY_ID.get(id), p.turns, gaps);
+    solve.ll[set] = { id, ok };
+    addCaseEvent(id, { d: Date.now(), src: 'solve', ok: ok ? 1 : 0, t: p.exec, n: p.turns });
+  }
   solves.push(solve);
   saveSolves();
   selectedId = solve.id;
@@ -936,6 +1141,218 @@ function renderTimer(note) {
     if (!timer.scramble) scr.renderMessage('–', '');
   }
   $('timerNote').textContent = note || (timer.phase === 'scrambling' ? 'Apply the scramble.' : timer.phase === 'running' ? 'Solving… the timer stops when the cube is solved.' : '');
+}
+
+/* ------------------------------ Trainer ---------------------------------- */
+const trk = new Tracker('t');
+const train = { phase: 'off', set: 'oll', caseId: null, targetAlg: '', target: null, t0: 0, rec: [], busy: false, raf: 0 };
+const trainOpts = { pick: 'smart', top: 'yellow', hide: false };
+try { Object.assign(trainOpts, JSON.parse(localStorage.getItem('micube.train.v1') || '{}')); } catch (e) { /* ignore */ }
+const saveTrainOpts = () => { try { localStorage.setItem('micube.train.v1', JSON.stringify({ ...trainOpts, set: train.set })); } catch (e) { /* ignore */ } };
+if (trainOpts.set) train.set = trainOpts.set;
+let selectedCase = null;
+
+// Holding yellow on top with a white cross means the last layer is the smart cube's D face.
+const llConj = () => trainOpts.top === 'white' ? '' : 'z2';
+const userCross = () => trainOpts.top === 'white' ? 'D' : 'U';
+const COLOR_FLIP = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' };
+
+function diagramHTML(c) {
+  const layout = [null, 47, 46, 45, null, 36, 0, 1, 2, 11, 37, 3, 4, 5, 10, 38, 6, 7, 8, 9, null, 18, 19, 20, null];
+  const map = ch => llConj() ? COLOR_FLIP[ch] : ch;
+  return layout.map(i => {
+    if (i === null) return '<div></div>';
+    const ch = c.state[i];
+    const col = c.set === 'oll' ? (ch === 'U' ? `var(--c${map('U')})` : '#3a3f4a') : `var(--c${map(ch)})`;
+    return `<div style="background:${col}"></div>`;
+  }).join('');
+}
+
+function pickCase() {
+  let pool = CASES[train.set];
+  if (trainOpts.pick === 'star') { const st = pool.filter(c => prog[c.id] && prog[c.id].star); if (st.length) pool = st; }
+  if (pool.length > 1) pool = pool.filter(c => c.id !== train.caseId);
+  const W = { unseen: 3, notknown: 4, learning: 3, learned: 1 };
+  const weights = pool.map(c => trainOpts.pick === 'smart' ? W[caseStatus(c.id)] : 1);
+  let r = Math.random() * weights.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < pool.length; i++) { r -= weights[i]; if (r < 0) return pool[i].id; }
+  return pool[pool.length - 1].id;
+}
+
+async function trainNext(id) {
+  if (!solver.ready) return;
+  cancelAnimationFrame(train.raf);
+  train.caseId = id || pickCase();
+  $('trAlg').dataset.revealed = '';
+  const c = CASE_BY_ID.get(train.caseId);
+  if (c.set !== train.set) { train.set = c.set; renderTrainTab(); }
+  const conj = llConj();
+  const core = normAlg(`${conj} ${invertAlg(prefAlg(c))} ${AUF[Math.floor(Math.random() * 4)]} ${conj}`);
+  train.targetAlg = normAlg(core + ' ' + reorientFor(core));
+  train.target = applyMoves(SOLVED, train.targetAlg);
+  train.phase = 'setup';
+  train.rec = [];
+  trk.clear();
+  $('trTimer').textContent = '0.00';
+  await trainReplan();
+}
+
+async function trainReplan(reason) {
+  if (train.busy) return;
+  train.busy = true;
+  renderTrainer((reason ? reason + ' ' : '') + 'Calculating set-up moves…');
+  const from = current;
+  try {
+    trk.set(await pathTo(from, train.targetAlg), from);
+  } catch (e) {
+    train.busy = false; renderTrainer('Error: ' + e.message); return;
+  }
+  train.busy = false;
+  if (train.phase !== 'setup') return;
+  if (current === train.target) train.phase = 'ready';
+  else if (current !== from && !trk.track(current)) { trainReplan('Off track.'); return; }
+  renderTrainer();
+}
+
+function trainDone(s) {
+  const X = userCross(), Y = OPP[X];
+  if (!(crossDone(s, X) && slotCount(s, X) === 4)) return false;
+  if (train.set === 'oll') return faceDone(s, Y);
+  return s === SOLVED || [Y, Y + '2', Y + "'"].some(a => applyMoves(s, a) === SOLVED);
+}
+
+function trainOnState(prev, moves) {
+  const now = performance.now();
+  if (train.phase === 'setup') {
+    if (train.busy) return;
+    const ok = trk.track(current);
+    if (current === train.target) train.phase = 'ready';
+    else if (!ok) { trainReplan('Off track.'); return; }
+    renderTrainer();
+    return;
+  }
+  if (train.phase === 'ready') {
+    train.phase = 'running'; train.t0 = now; train.rec = [];
+    const loop = () => {
+      if (train.phase !== 'running') return;
+      $('trTimer').textContent = fmt(performance.now() - train.t0);
+      train.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+  if (train.phase === 'running') {
+    const t = Math.round(now - train.t0);
+    for (const m of moves) train.rec.push({ m, t });
+    if (trainDone(current)) finishTrain(t);
+    else renderTrainer();
+  }
+}
+
+function finishTrain(t) {
+  cancelAnimationFrame(train.raf);
+  const c = CASE_BY_ID.get(train.caseId);
+  const gaps = train.rec.slice(1).map((r, i) => r.t - train.rec[i].t);
+  const ok = judgeLook(c, train.rec.length, gaps);
+  addCaseEvent(c.id, { d: Date.now(), src: 'train', ok: ok ? 1 : 0, t, n: train.rec.length });
+  train.phase = 'done';
+  $('trTimer').textContent = fmt(t);
+  renderTrainer(`${fmt(t)} · ${train.rec.length} turns · ${ok ? 'one-look ✓' : 'not one-look (pause or extra turns)'} — next case…`);
+  renderCaseGrid(); renderCaseDetail(); renderLegend();
+  setTimeout(() => { if (train.phase === 'done' && mode === 'train') trainNext(); }, 1500);
+}
+
+function stopTraining(note) {
+  cancelAnimationFrame(train.raf);
+  train.phase = 'off'; train.busy = false; trk.clear();
+  renderTrainer(note);
+}
+
+function renderTrainer(note) {
+  const on = train.phase !== 'off';
+  $('btnTrain').textContent = on ? 'Stop' : 'Start training';
+  $('btnTrain').classList.toggle('primary', !on);
+  $('btnTrain').disabled = !solver.ready;
+  $('btnSkip').classList.toggle('hidden', !on);
+  $('trActive').classList.toggle('hidden', !on);
+  if (!on) return;
+  const c = CASE_BY_ID.get(train.caseId);
+  $('trDiag').innerHTML = diagramHTML(c);
+  $('trName').innerHTML = `${caseLabel(c)} <span class="st-dot st-${caseStatus(c.id)}" style="font-size:13px;font-weight:400;color:var(--muted)">${STATUS_TEXT[caseStatus(c.id)]}</span>`;
+  const alg = $('trAlg');
+  const hide = trainOpts.hide && train.phase !== 'done' && !alg.dataset.revealed;
+  alg.className = 'tr-alg' + (hide ? ' hid' : '');
+  alg.textContent = hide ? 'Algorithm hidden — tap to reveal' : prefAlg(c);
+  $('trSetup').classList.toggle('hidden', train.phase === 'running' || train.phase === 'done');
+  $('trTimer').className = 'timer' + (train.phase === 'ready' ? ' ready' : train.phase === 'running' ? ' running' : '');
+  if (train.phase === 'setup') {
+    if (train.busy || !trk.active) trk.renderMessage('…', 'Calculating…'); else trk.renderSteps();
+  }
+  const defaults = {
+    setup: `Set up the case: do these moves (hold ${trainOpts.top} on top, green in front).`,
+    ready: 'Ready! Do the algorithm — the timer starts on your first turn.',
+    running: 'Go!', done: '',
+  };
+  $('trNote').textContent = note || defaults[train.phase] || '';
+}
+
+function renderLegend() {
+  const counts = { learned: 0, learning: 0, notknown: 0, unseen: 0 };
+  for (const c of CASES[train.set]) counts[caseStatus(c.id)]++;
+  $('legend').innerHTML = Object.keys(counts).map(k => `<span class="st-${k}">${STATUS_TEXT[k]} ${counts[k]}</span>`).join('');
+}
+
+function caseStatsText(id) {
+  const ev = (prog[id] && prog[id].ev) || [];
+  const tr = ev.filter(e => e.src === 'train' && e.ok).map(e => e.t);
+  return tr.length ? `best ${fmt(Math.min(...tr))}` : ev.length ? `${ev.length} seen` : '';
+}
+
+function renderCaseGrid() {
+  $('caseGrid').innerHTML = CASES[train.set].map(c => {
+    const st = caseStatus(c.id), star = prog[c.id] && prog[c.id].star ? '★ ' : '';
+    return `<button class="case-card st-${st}${c.id === selectedCase ? ' sel' : ''}" data-case="${c.id}" title="${STATUS_TEXT[st]}">
+      <div class="diag">${diagramHTML(c)}</div><div class="nm">${star}${caseLabel(c)}</div><div class="sm">${caseStatsText(c.id) || STATUS_TEXT[st]}</div></button>`;
+  }).join('');
+}
+
+function renderCaseDetail() {
+  const box = $('caseDetail');
+  const c = selectedCase && CASE_BY_ID.get(selectedCase);
+  box.classList.toggle('hidden', !c || c.set !== train.set);
+  if (!c || c.set !== train.set) return;
+  const p = prog[c.id] || { ev: [] };
+  const ev = p.ev || [];
+  const pref = p.pref || 0;
+  const trainTimes = ev.filter(e => e.src === 'train' && e.ok).map(e => e.t);
+  const fromSolves = ev.filter(e => e.src === 'solve');
+  const avg = trainTimes.length ? trainTimes.slice(-12).reduce((a, b) => a + b, 0) / Math.min(12, trainTimes.length) : null;
+  const st = caseStatus(c.id);
+  box.innerHTML = `
+    <div class="row" style="align-items:flex-start;gap:14px">
+      <div class="diag big">${diagramHTML(c)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="tr-name">${caseLabel(c)}</div>
+        <div class="msg" style="margin-top:2px"><span class="st-dot st-${st}">${STATUS_TEXT[st]}</span> · ${c.subset.replace(/-/g, ' ')}</div>
+        <div class="msg" style="margin-top:2px">Attempts ${ev.length} · one-look ${ev.filter(e => e.ok).length} · in timed solves ${fromSolves.length}${fromSolves.length ? ` (one-look ${fromSolves.filter(e => e.ok).length})` : ''}</div>
+        <div class="msg" style="margin-top:2px">Best ${fmt(trainTimes.length ? Math.min(...trainTimes) : null)} · average ${fmt(avg)}</div>
+      </div>
+    </div>
+    <div style="margin-top:10px">${c.algs.map((a, i) => `<label class="alg-opt"><input type="radio" name="algpick" value="${i}" ${i === pref ? 'checked' : ''}> <span>${a}</span></label>`).join('')}</div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="cdTrain">Train this case</button>
+      <button id="cdStar">${p.star ? '★ Starred' : '☆ Star'}</button>
+      <button id="cdReset" class="danger">Reset progress</button>
+    </div>`;
+  box.querySelectorAll('input[name=algpick]').forEach(r => r.onchange = () => { progOf(c.id).pref = Number(r.value); saveProg(); if (train.caseId === c.id && train.phase !== 'off') renderTrainer(); });
+  $('cdTrain').onclick = () => { $('trAlg').dataset.revealed = ''; trainNext(c.id); $('tab-train').scrollIntoView({ behavior: 'smooth' }); };
+  $('cdStar').onclick = () => { progOf(c.id).star = !progOf(c.id).star; saveProg(); renderCaseDetail(); renderCaseGrid(); };
+  $('cdReset').onclick = () => { if (!confirm('Reset progress for this case?')) return; progOf(c.id).ev = []; saveProg(); renderCaseDetail(); renderCaseGrid(); renderLegend(); };
+}
+
+function renderTrainTab() {
+  document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('active', b.dataset.set === train.set));
+  $('trPick').value = trainOpts.pick; $('trTop').value = trainOpts.top; $('trHide').checked = trainOpts.hide;
+  renderLegend(); renderCaseGrid(); renderCaseDetail(); renderTrainer();
 }
 
 /* ------------------------------- History --------------------------------- */
@@ -998,7 +1415,12 @@ function renderDetail() {
   $('detailTitle').textContent = `Solve #${idx} · ${fmt(s.time)} · cross on ${s.crossFace}`;
   let html = '<tr><th>Phase</th><th>Time</th><th>Recog.</th><th>Exec.</th><th>Turns</th><th>TPS</th></tr>';
   for (const p of s.phases) {
-    const skip = p.turns === 0 ? ' <span style="color:var(--ok)">skip</span>' : '';
+    let skip = p.turns === 0 ? ' <span style="color:var(--ok)">skip</span>' : '';
+    const ll = s.ll && s.ll[p.name.toLowerCase()];
+    if (ll && ll.id !== 'skip') {
+      const c = CASE_BY_ID.get(ll.id);
+      skip += ` <span class="ll-tag">${c ? caseLabel(c) : ll.id} ${ll.ok ? '<span style="color:var(--ok)">one-look</span>' : '<span style="color:var(--warn)">not one-look</span>'}</span>`;
+    }
     const tps = p.exec > 0 ? (p.turns / (p.exec / 1000)).toFixed(2) : '–';
     html += `<tr><td>${p.name}${skip}</td><td>${fmt(p.time)}</td><td>${fmt(p.recog)}</td><td>${fmt(p.exec)}</td><td>${p.turns}</td><td>${tps}</td></tr>`;
   }
@@ -1078,6 +1500,7 @@ function onStateChange(state, move) {
   const moves = move && applyMoves(prev, move) === state ? [move] : findMoves(prev, state);
   if (!replay.active) render(current, prev, moves);
   if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
+  else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
   else guideOnState(move || (moves && moves[0]));
 }
 
@@ -1086,6 +1509,7 @@ function onSolverReady() {
   $('btnSolve').disabled = false;
   renderGuide();
   renderTimer();
+  if (mode === 'train') renderTrainer();
   if (mode === 'timer' && timer.phase === 'idle') newScramble();
 }
 
@@ -1094,8 +1518,13 @@ function setMode(m) {
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === m));
   $('tab-guide').classList.toggle('hidden', m !== 'guide');
   $('tab-timer').classList.toggle('hidden', m !== 'timer');
+  $('tab-train').classList.toggle('hidden', m !== 'train');
   try { localStorage.setItem('micube.tab', m); } catch (e) { /* ignore */ }
-  if (m === 'timer') {
+  if (m !== 'train' && train.phase !== 'off') stopTraining();
+  if (m === 'train') {
+    if (timer.phase === 'running' || timer.phase === 'ready') cancelRun();
+    renderTrainTab();
+  } else if (m === 'timer') {
     if (timer.phase === 'idle' && solver.ready) newScramble();
     else if (timer.phase === 'scrambling' && !timer.busy && scr.active && !scr.track(current)) replanScramble('Cube changed.');
     else if (timer.phase === 'ready' && current !== timer.target) { timer.phase = 'scrambling'; replanScramble('Cube changed.'); }
@@ -1284,6 +1713,25 @@ $('btnDelete').onclick = () => {
   selectedId = solves.length ? solves[solves.length - 1].id : null;
   saveSolves(); renderStats(); renderHistory(); renderDetail();
 };
+document.querySelectorAll('#setSeg button').forEach(b => b.onclick = () => {
+  if (train.set === b.dataset.set) return;
+  train.set = b.dataset.set; saveTrainOpts();
+  if (train.phase !== 'off') trainNext();
+  renderTrainTab();
+});
+$('btnTrain').onclick = () => { if (train.phase === 'off') { $('trAlg').dataset.revealed = ''; trainNext(); } else stopTraining(); };
+$('btnSkip').onclick = () => { $('trAlg').dataset.revealed = ''; trainNext(); };
+$('trPick').onchange = e => { trainOpts.pick = e.target.value; saveTrainOpts(); };
+$('trTop').onchange = e => { trainOpts.top = e.target.value; saveTrainOpts(); renderTrainTab(); if (train.phase !== 'off') trainNext(train.caseId); };
+$('trHide').onchange = e => { trainOpts.hide = e.target.checked; saveTrainOpts(); renderTrainer(); };
+$('trAlg').onclick = () => { $('trAlg').dataset.revealed = '1'; renderTrainer(); };
+$('caseGrid').onclick = e => {
+  const b = e.target.closest('[data-case]');
+  if (!b) return;
+  selectedCase = selectedCase === b.dataset.case ? null : b.dataset.case;
+  renderCaseGrid(); renderCaseDetail();
+  if (selectedCase) $('caseDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
 $('rpPlay').onclick = () => playReplay(!replay.playing);
 $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
@@ -1342,7 +1790,8 @@ if (typeof Cube === 'undefined') {
   renderGuide();
   let saved = 'guide';
   try { saved = localStorage.getItem('micube.tab') || 'guide'; } catch (e) { /* ignore */ }
-  setMode(saved === 'timer' ? 'timer' : 'guide');
+  buildCases();
+  setMode(['timer', 'train'].includes(saved) ? saved : 'guide');
   solver.init();
 }
 </script>

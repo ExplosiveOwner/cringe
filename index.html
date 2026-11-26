@@ -148,7 +148,7 @@
 <header>
   <h1>Mi Smart Magic Cube</h1>
   <div class="row">
-    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span><span id="lastTurn"></span></div>
     <button class="primary" id="btnConnect">Connect cube</button>
     <button id="btnConnectAll" title="Use this if your cube doesn't appear in the normal list">Show all devices</button>
     <button id="btnDisconnect" disabled>Disconnect</button>
@@ -887,6 +887,7 @@ class Tracker {
   constructor(prefix) {
     this.el = {};
     for (const k of ['Moves', 'Next', 'Sub', 'Prog', 'ProgText']) this.el[k] = $(prefix + k);
+    this.view = m => m;   // how a move is named for the way the user holds the cube
     this.clear();
   }
   set(moves, start) {
@@ -922,14 +923,14 @@ class Tracker {
     Moves.innerHTML = '';
     this.moves.forEach((m, i) => {
       const s = document.createElement('span');
-      s.textContent = m;
+      s.textContent = this.view(m);
       if (i < this.idx) s.className = 'done';
       else if (i === this.idx) s.className = this.half ? 'half' : 'cur';
       Moves.appendChild(s);
     });
     const m = this.moves[this.idx];
-    Next.textContent = m || '✓';
-    Sub.innerHTML = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(m)) : '';
+    Next.textContent = m ? this.view(m) : '✓';
+    Sub.innerHTML = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(this.view(m), m[0])) : '';
     Prog.style.width = (this.moves.length ? 100 * this.idx / this.moves.length : 100) + '%';
     ProgText.textContent = this.moves.length ? `Step ${Math.min(this.idx + 1, this.moves.length)} of ${this.moves.length}` : '';
   }
@@ -937,9 +938,9 @@ class Tracker {
 
 const FACE_NAMES = { U: 'Top', D: 'Bottom', R: 'Right', L: 'Left', F: 'Front', B: 'Back' };
 /** HTML: colour swatch + face + direction. */
-function describeMove(m) {
+function describeMove(m, colorFace = m[0]) {
   const how = m.endsWith('2') ? '180°' : m.endsWith("'") ? 'counter-clockwise' : 'clockwise';
-  return `<span class="sw" style="background:var(--c${m[0]})"></span>${FACE_NAMES[m[0]]} face, ${how}`;
+  return `<span class="sw" style="background:var(--c${colorFace})"></span>${FACE_NAMES[m[0]]} face, ${how}`;
 }
 
 function solverStatus(text, err) {
@@ -1145,6 +1146,8 @@ function renderTimer(note) {
 
 /* ------------------------------ Trainer ---------------------------------- */
 const trk = new Tracker('t');
+// Holding yellow on top (cube flipped with z2) swaps right/left and top/bottom; front/back stay.
+trk.view = m => llConj() ? { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' }[m[0]] + m.slice(1) : m;
 const train = { phase: 'off', set: 'oll', caseId: null, targetAlg: '', target: null, t0: 0, rec: [], busy: false, raf: 0 };
 const trainOpts = { pick: 'smart', top: 'yellow', hide: false };
 try { Object.assign(trainOpts, JSON.parse(localStorage.getItem('micube.train.v1') || '{}')); } catch (e) { /* ignore */ }
@@ -1627,6 +1630,10 @@ function handlePacket(dv) {
     log(`state jump (last move ${move} doesn't explain it) ${hex}`);
   } else {
     log(`${move || '·'}  ${hex}`);
+  }
+  if (move && r.facelets !== current) {
+    const label = mode === 'train' ? trk.view(move) : move;
+    $('lastTurn').innerHTML = ` · last turn <span class="sw" style="background:var(--c${move[0]})"></span>${label}`;
   }
   onStateChange(r.facelets, move);
 }

@@ -11,7 +11,7 @@
   :root {
     --bg: #0f1115; --panel: #181b22; --panel2: #20242d; --line: #2c313c;
     --text: #e7e9ee; --muted: #8b93a3; --accent: #4f8cff; --ok: #3ccf7a; --warn: #f5b942; --bad: #ff5d5d;
-    --cU: #f4f4f4; --cR: #d6262b; --cF: #1fa64a; --cD: #ffd500; --cL: #ff7a00; --cB: #1e5bd8;
+    --cU: #eeede8; --cR: #e0605a; --cF: #5cbf86; --cD: #f2d86a; --cL: #f29e5c; --cB: #5a92dd;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
@@ -172,8 +172,11 @@
     <details style="margin-top:8px">
       <summary>Colours</summary>
       <div class="colors" id="colors"></div>
-      <div class="row" style="margin-top:8px"><button id="btnColorReset">Reset to default colours</button></div>
-      <div class="msg">Tap a swatch to match your cube's sticker colour. Saved on this device.</div>
+      <div class="row" style="margin-top:8px">
+        <button id="btnColorXiaomi">Xiaomi (pale)</button>
+        <button id="btnColorClassic">Classic (bright)</button>
+      </div>
+      <div class="msg">Pick a preset, or tap a swatch to fine-tune a face to your cube's sticker colour. Saved on this device.</div>
     </details>
     <details style="margin-top:8px">
       <summary>Bluetooth log</summary>
@@ -1217,7 +1220,10 @@ $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
 
 /* ------------------------------- Colours --------------------------------- */
-const DEFAULT_COLORS = { U: '#f4f4f4', R: '#d6262b', F: '#1fa64a', D: '#ffd500', L: '#ff7a00', B: '#1e5bd8' };
+// Xiaomi Mi Smart Magic Cube: black body with pale, slightly muted stickers (standard colour layout).
+const XIAOMI_COLORS = { U: '#eeede8', R: '#e0605a', F: '#5cbf86', D: '#f2d86a', L: '#f29e5c', B: '#5a92dd' };
+const CLASSIC_COLORS = { U: '#f4f4f4', R: '#d6262b', F: '#1fa64a', D: '#ffd500', L: '#ff7a00', B: '#1e5bd8' };
+const DEFAULT_COLORS = XIAOMI_COLORS;
 const COLOR_KEY = 'micube.colors.v1';
 let colors = { ...DEFAULT_COLORS };
 function applyColors() {
@@ -1237,11 +1243,13 @@ function applyColors() {
       try { localStorage.setItem(COLOR_KEY, JSON.stringify(colors)); } catch (err) { /* ignore */ }
     });
   }
-  $('btnColorReset').onclick = () => {
-    colors = { ...DEFAULT_COLORS };
-    try { localStorage.removeItem(COLOR_KEY); } catch (e) { /* ignore */ }
+  const preset = (pal, store) => () => {
+    colors = { ...pal };
+    try { store ? localStorage.setItem(COLOR_KEY, JSON.stringify(colors)) : localStorage.removeItem(COLOR_KEY); } catch (e) { /* ignore */ }
     applyColors();
   };
+  $('btnColorXiaomi').onclick = preset(XIAOMI_COLORS, false);
+  $('btnColorClassic').onclick = preset(CLASSIC_COLORS, true);
   applyColors();
 })();
 

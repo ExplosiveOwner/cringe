@@ -119,6 +119,7 @@
   <div class="row">
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span></div>
     <button class="primary" id="btnConnect">Connect cube</button>
+    <button id="btnConnectAll" title="Use this if your cube doesn't appear in the normal list">Show all devices</button>
     <button id="btnDisconnect" disabled>Disconnect</button>
   </div>
 </header>
@@ -1025,17 +1026,25 @@ function setMode(m) {
  * ------------------------------------------------------------------------- */
 let device = null, stateChar = null, ctrlWrite = null;
 
-async function connect() {
+async function connect(showAll) {
   if (!navigator.bluetooth) {
     alert('Web Bluetooth is not available in this browser.\n\nUse Chrome or Edge on desktop/Android (page must be served over https or localhost). On iOS use the Bluefy browser.');
     return;
   }
   try {
     setStatus('Choosing device…', 'busy');
-    device = await navigator.bluetooth.requestDevice({
+    // Xiaomi / Giiker cubes usually advertise as "GiCxxxxx" / "GiSxxxxx", but names vary by firmware,
+    // so "Show all devices" lists every nearby BLE device as a fallback.
+    device = await navigator.bluetooth.requestDevice(showAll ? {
+      acceptAllDevices: true,
+      optionalServices: [SVC_DATA, SVC_CTRL],
+    } : {
       filters: [
-        { namePrefix: 'Gi' },          // Xiaomi / Giiker cubes advertise as "GiCxxxxx" / "GiSxxxxx"
-        { namePrefix: 'Mi Smart' },
+        { namePrefix: 'Gi' },
+        { namePrefix: 'Mi' },
+        { namePrefix: 'XM' },
+        { namePrefix: 'Xiaomi' },
+        { namePrefix: 'Hi-' },
         { services: [SVC_DATA] },
       ],
       optionalServices: [SVC_DATA, SVC_CTRL],
@@ -1044,7 +1053,9 @@ async function connect() {
     setStatus('Connecting to ' + (device.name || 'cube') + '…', 'busy');
     log('Selected ' + (device.name || device.id));
     const server = await device.gatt.connect();
-    const svc = await server.getPrimaryService(SVC_DATA);
+    let svc;
+    try { svc = await server.getPrimaryService(SVC_DATA); }
+    catch (e) { device.gatt.disconnect(); throw new Error(`"${device.name || 'This device'}" isn't a Xiaomi/Giiker cube (no cube data service found).`); }
     stateChar = await svc.getCharacteristic(CHR_STATE);
     stateChar.addEventListener('characteristicvaluechanged', e => handlePacket(e.target.value));
     await stateChar.startNotifications();
@@ -1068,10 +1079,11 @@ async function connect() {
 
     setStatus('Connected: ' + (device.name || 'cube'), 'on');
     $('btnConnect').disabled = true;
+    $('btnConnectAll').disabled = true;
     $('btnDisconnect').disabled = false;
   } catch (e) {
-    log('Connect failed: ' + e.message);
-    setStatus(e.name === 'NotFoundError' ? 'Not connected' : 'Error: ' + e.message, '');
+    log('Connect failed: ' + e.name + ': ' + e.message);
+    setStatus(e.name === 'NotFoundError' && /cancel/i.test(e.message) ? 'Not connected' : 'Error: ' + e.message, '');
   }
 }
 
@@ -1080,6 +1092,7 @@ function onDisconnected() {
   setStatus('Disconnected', '');
   stateChar = null; ctrlWrite = null;
   $('btnConnect').disabled = false;
+  $('btnConnectAll').disabled = false;
   $('btnDisconnect').disabled = true;
   $('btnMarkSolved').disabled = true;
   $('battery').textContent = '';
@@ -1144,7 +1157,8 @@ function handlePacket(dv) {
 /* ---------------------------------------------------------------------------
  * Wire up
  * ------------------------------------------------------------------------- */
-$('btnConnect').onclick = connect;
+$('btnConnect').onclick = () => connect(false);
+$('btnConnectAll').onclick = () => connect(true);
 $('btnDisconnect').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
 $('btnSolve').onclick = () => solveNow();
 $('btnMarkSolved').onclick = async () => {

@@ -109,6 +109,13 @@
   .log { font: 12px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted);
     max-height: 140px; overflow: auto; white-space: pre-wrap; word-break: break-all;
     background: var(--panel2); border-radius: 8px; padding: 8px; margin-top: 8px; }
+  .colors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 8px; }
+  .colors label { display: flex; align-items: center; gap: 8px; background: var(--panel2); border-radius: 8px;
+    padding: 6px 8px; font-size: 14px; }
+  .colors input[type=color] { width: 36px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 6px;
+    background: none; cursor: pointer; flex: none; }
+  .sw { display: inline-block; width: .9em; height: .9em; border-radius: 3px; vertical-align: -1px;
+    outline: 1px solid rgba(255,255,255,.25); margin-right: 4px; }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
 </style>
@@ -161,6 +168,12 @@
         <button id="btnReset">Reset to solved</button>
       </div>
       <div class="msg">Keyboard: U R F D L B (hold Shift for prime). These apply to the on-screen state; a connected cube overrides it on its next packet.</div>
+    </details>
+    <details style="margin-top:8px">
+      <summary>Colours</summary>
+      <div class="colors" id="colors"></div>
+      <div class="row" style="margin-top:8px"><button id="btnColorReset">Reset to default colours</button></div>
+      <div class="msg">Tap a swatch to match your cube's sticker colour. Saved on this device.</div>
     </details>
     <details style="margin-top:8px">
       <summary>Bluetooth log</summary>
@@ -648,16 +661,17 @@ class Tracker {
     });
     const m = this.moves[this.idx];
     Next.textContent = m || '✓';
-    Sub.textContent = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(m)) : '';
+    Sub.innerHTML = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(m)) : '';
     Prog.style.width = (this.moves.length ? 100 * this.idx / this.moves.length : 100) + '%';
     ProgText.textContent = this.moves.length ? `Step ${Math.min(this.idx + 1, this.moves.length)} of ${this.moves.length}` : '';
   }
 }
 
+const FACE_NAMES = { U: 'Top', D: 'Bottom', R: 'Right', L: 'Left', F: 'Front', B: 'Back' };
+/** HTML: colour swatch + face + direction. */
 function describeMove(m) {
-  const names = { U: 'Up (white)', D: 'Down (yellow)', R: 'Right (red)', L: 'Left (orange)', F: 'Front (green)', B: 'Back (blue)' };
   const how = m.endsWith('2') ? '180°' : m.endsWith("'") ? 'counter-clockwise' : 'clockwise';
-  return `${names[m[0]]} face, ${how}`;
+  return `<span class="sw" style="background:var(--c${m[0]})"></span>${FACE_NAMES[m[0]]} face, ${how}`;
 }
 
 function solverStatus(text, err) {
@@ -1201,6 +1215,35 @@ $('btnDelete').onclick = () => {
 $('rpPlay').onclick = () => playReplay(!replay.playing);
 $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
+
+/* ------------------------------- Colours --------------------------------- */
+const DEFAULT_COLORS = { U: '#f4f4f4', R: '#d6262b', F: '#1fa64a', D: '#ffd500', L: '#ff7a00', B: '#1e5bd8' };
+const COLOR_KEY = 'micube.colors.v1';
+let colors = { ...DEFAULT_COLORS };
+function applyColors() {
+  for (const f of FACES) document.documentElement.style.setProperty('--c' + f, colors[f]);
+  for (const f of FACES) { const inp = $('col' + f); if (inp) inp.value = colors[f]; }
+}
+(function setupColors() {
+  try { Object.assign(colors, JSON.parse(localStorage.getItem(COLOR_KEY) || '{}')); } catch (e) { /* ignore */ }
+  const box = $('colors');
+  for (const f of 'UFRDBL') {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="color" id="col${f}"> ${FACE_NAMES[f]}`;
+    box.appendChild(l);
+    l.querySelector('input').addEventListener('input', e => {
+      colors[f] = e.target.value;
+      applyColors();
+      try { localStorage.setItem(COLOR_KEY, JSON.stringify(colors)); } catch (err) { /* ignore */ }
+    });
+  }
+  $('btnColorReset').onclick = () => {
+    colors = { ...DEFAULT_COLORS };
+    try { localStorage.removeItem(COLOR_KEY); } catch (e) { /* ignore */ }
+    applyColors();
+  };
+  applyColors();
+})();
 
 loadSolves();
 selectedId = solves.length ? solves[solves.length - 1].id : null;

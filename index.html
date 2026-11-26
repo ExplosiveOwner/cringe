@@ -51,7 +51,8 @@
   .scene { width: 210px; height: 210px; perspective: 700px; touch-action: none; cursor: grab; flex: none; }
   .cube3d { position: relative; width: 120px; height: 120px; margin: 45px; transform-style: preserve-3d; }
   .cubie { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; transform-style: preserve-3d; }
-  .pl { position: absolute; inset: 0; background: #111; backface-visibility: hidden; border-radius: 3px; }
+  .pl { position: absolute; inset: 0; background: #111; backface-visibility: hidden; }
+  .cap { position: absolute; left: 0; top: 0; width: 120px; height: 120px; background: #111; }
   .pl > div { position: absolute; inset: 2px; border-radius: 5px; }
   .net { display: grid; grid-template-columns: repeat(12, 1fr); gap: 2px; width: min(100%, 360px); }
   .net div { aspect-ratio: 1; border-radius: 3px; transition: background-color .12s; }
@@ -670,7 +671,9 @@ function faceletPos(f, i) {
     const base = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
     el.style.transform = base;
     const planes = {};
-    for (const f of FACES) {   // black on all sides so gaps show a solid interior mid-turn
+    const outside = { U: y === 1, D: y === -1, R: x === 1, L: x === -1, F: z === 1, B: z === -1 };
+    for (const f of FACES) {   // only the outward faces; caps fill the gap of a turning layer
+      if (!outside[f]) continue;
       const pl = document.createElement('div');
       pl.className = 'pl';
       pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
@@ -707,37 +710,67 @@ function paint3d(state) {
 /* Turn animation: rotate the 9 cubies of the layer, then snap back and repaint with the new state. */
 const LAYER = { U: ['y', 1], D: ['y', -1], R: ['x', 1], L: ['x', -1], F: ['z', 1], B: ['z', -1] };
 const ROT = { U: ['Y', -1], D: ['Y', 1], R: ['X', 1], L: ['X', -1], F: ['Z', 1], B: ['Z', -1] };
-const anim = { queue: [], busy: false, timer: 0, layer: null, enabled: true };
+const anim = { queue: [], busy: false, timer: 0, startTimer: 0, moving: null, caps: null, enabled: true };
+const OPPOSITE = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+
+/** A solid black square closing off the inside of the cube at a layer boundary. */
+function makeCap(axis, pos) {
+  const el = document.createElement('div');
+  el.className = 'cap';
+  const base = axis === 'x' ? `translate3d(${pos}px, 0, 0) rotateY(90deg)`
+    : axis === 'y' ? `translate3d(0, ${-pos}px, 0) rotateX(90deg)` : `translate3d(0, 0, ${pos}px)`;
+  el.style.transform = base;
+  cube3d.appendChild(el);
+  return { el, base };
+}
+
+function endAnim() {
+  if (anim.moving) for (const c of anim.moving) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
+  if (anim.caps) for (const el of anim.caps) el.remove();
+  anim.moving = null; anim.caps = null;
+}
 
 function stopAnim() {
-  clearTimeout(anim.timer);
-  if (anim.layer) for (const c of anim.layer) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
-  anim.layer = null; anim.busy = false; anim.queue.length = 0;
+  clearTimeout(anim.timer); clearTimeout(anim.startTimer);
+  endAnim();
+  anim.busy = false; anim.queue.length = 0;
 }
 
 function runAnim() {
-  const item = anim.queue.shift();
-  if (!item) { anim.busy = false; return; }
-  if (anim.queue.length > 4) {           // far behind (very fast turning): jump to the latest state
+  if (anim.queue.length > 5) {           // far behind (very fast turning): jump to the latest state
     const last = anim.queue[anim.queue.length - 1];
     anim.queue.length = 0;
     paint3d(last.s); anim.busy = false; return;
   }
+  const first = anim.queue.shift();
+  if (!first) { anim.busy = false; return; }
   anim.busy = true;
-  const m = item.m, [axis, val] = LAYER[m[0]], [rAxis, sign] = ROT[m[0]];
-  const amt = m.endsWith('2') ? 2 : m.endsWith("'") ? -1 : 1;
-  const dur = (amt === 2 ? 1.5 : 1) * (anim.queue.length ? 90 : 170);
-  const layer = cubies.filter(c => c[axis] === val);
-  anim.layer = layer;
-  for (const c of layer) {
-    void c.el.offsetWidth;   // make sure the transition starts from the resting position
+  // Opposite faces commute, so turn them together. A middle-layer move (M/E/S) arrives as such a
+  // pair (e.g. M = R + L'), so it animates as one movement.
+  const items = [first];
+  if (anim.queue[0] && anim.queue[0].m[0] === OPPOSITE[first.m[0]]) items.push(anim.queue.shift());
+  const fast = anim.queue.length > 0;
+  const moving = [], caps = [];
+  let dur = 0;
+  for (const it of items) {
+    const f = it.m[0], [axis, val] = LAYER[f], [rAxis, sign] = ROT[f];
+    const amt = it.m.endsWith('2') ? 2 : it.m.endsWith("'") ? -1 : 1;
+    dur = Math.max(dur, (amt === 2 ? 1.5 : 1) * (fast ? 90 : 170));
+    const rot = `rotate${rAxis}(${sign * amt * 90}deg)`;
+    const turning = makeCap(axis, val * CUBIE / 2), still = makeCap(axis, val * CUBIE / 2);
+    caps.push(turning.el, still.el);
+    for (const c of cubies) if (c[axis] === val) moving.push({ c, rot });
+    moving.push({ c: turning, rot });
+  }
+  anim.moving = moving.map(x => x.c); anim.caps = caps;
+  void cube3d.offsetWidth;   // commit resting positions so the transition starts from there
+  for (const { c, rot } of moving) {
     c.el.style.transition = `transform ${dur}ms ease-out`;
-    c.el.style.transform = `rotate${rAxis}(${sign * amt * 90}deg) ${c.base}`;
+    c.el.style.transform = `${rot} ${c.base}`;
   }
   anim.timer = setTimeout(() => {
-    for (const c of layer) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
-    anim.layer = null;
-    paint3d(item.s);
+    endAnim();
+    paint3d(items[items.length - 1].s);
     runAnim();
   }, dur);
 }
@@ -751,7 +784,10 @@ function render(state, prev, moves) {
   let s = prev;
   for (const m of moves) { s = applyMoves(s, m); anim.queue.push({ m, s }); }
   if (s !== state) { stopAnim(); paint3d(state); return; }
-  if (!anim.busy) runAnim();
+  if (!anim.busy) {   // wait a moment so the second half of a middle-layer move can join
+    anim.busy = true;
+    anim.startTimer = setTimeout(runAnim, 40);
+  }
 }
 
 (function setupDrag() {
@@ -1408,7 +1444,22 @@ function renderHistory() {
   tbl.innerHTML = html;
 }
 
-function phaseMoves(s, p) { return s.moves.slice(p.a, p.b).map(r => r.m); }
+/* A middle-layer turn is reported as two opposite face turns (M = R + L'); show it as M/E/S again. */
+const SLICE_PAIRS = { "R L'": 'M', "R' L": "M'", 'R2 L2': 'M2', "U D'": 'E', "U' D": "E'", 'U2 D2': 'E2',
+  "F' B": 'S', "F B'": "S'", 'F2 B2': 'S2' };
+function withSlices(recs) {
+  const out = [];
+  for (let i = 0; i < recs.length; i++) {
+    const a = recs[i], b = recs[i + 1];
+    if (b && a.m !== '?' && b.m !== '?' && b.t - a.t <= 80) {
+      const sl = SLICE_PAIRS[a.m + ' ' + b.m] || SLICE_PAIRS[b.m + ' ' + a.m];
+      if (sl) { out.push(sl); i++; continue; }
+    }
+    out.push(a.m);
+  }
+  return out;
+}
+function phaseMoves(s, p) { return withSlices(s.moves.slice(p.a, p.b)); }
 
 function renderDetail() {
   const s = solves.find(x => x.id === selectedId);

@@ -11,7 +11,7 @@
   :root {
     --bg: #0f1115; --panel: #181b22; --panel2: #20242d; --line: #2c313c;
     --text: #e7e9ee; --muted: #8b93a3; --accent: #4f8cff; --ok: #3ccf7a; --warn: #f5b942; --bad: #ff5d5d;
-    --cU: #eeede8; --cR: #e0605a; --cF: #5cbf86; --cD: #f2d86a; --cL: #f29e5c; --cB: #5a92dd;
+    --cU: #f4f4f1; --cR: #f95b26; --cF: #c3d84a; --cD: #e8b444; --cL: #c8682f; --cB: #93b8e0;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; background: var(--bg); color: var(--text);
@@ -173,7 +173,7 @@
       <summary>Colours</summary>
       <div class="colors" id="colors"></div>
       <div class="row" style="margin-top:8px">
-        <button id="btnColorXiaomi">Xiaomi (pale)</button>
+        <button id="btnColorXiaomi">Xiaomi cube</button>
         <button id="btnColorClassic">Classic (bright)</button>
       </div>
       <div class="msg">Pick a preset, or tap a swatch to fine-tune a face to your cube's sticker colour. Saved on this device.</div>
@@ -1220,8 +1220,9 @@ $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
 
 /* ------------------------------- Colours --------------------------------- */
-// Xiaomi Mi Smart Magic Cube: black body with pale, slightly muted stickers (standard colour layout).
-const XIAOMI_COLORS = { U: '#eeede8', R: '#e0605a', F: '#5cbf86', D: '#f2d86a', L: '#f29e5c', B: '#5a92dd' };
+// Xiaomi Mi Smart Magic Cube sticker colours, sampled from photos of a real cube (standard colour layout):
+// orange-red, lime green, golden yellow, brownish orange, light sky blue.
+const XIAOMI_COLORS = { U: '#f4f4f1', R: '#f95b26', F: '#c3d84a', D: '#e8b444', L: '#c8682f', B: '#93b8e0' };
 const CLASSIC_COLORS = { U: '#f4f4f4', R: '#d6262b', F: '#1fa64a', D: '#ffd500', L: '#ff7a00', B: '#1e5bd8' };
 const DEFAULT_COLORS = XIAOMI_COLORS;
 const COLOR_KEY = 'micube.colors.v1';

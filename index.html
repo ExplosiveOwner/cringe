@@ -1309,7 +1309,9 @@ function renderGuide() {
     const stage = current === SOLVED ? 9 : bPlan ? bPlan.stage : 0;
     $('bStages').innerHTML = B_STAGES.map((n, i) => `<li class="${i + 1 < stage ? 'done' : i + 1 === stage ? 'cur' : ''}">${i + 1}. ${n}</li>`).join('');
     $('bTitle').textContent = current === SOLVED ? 'Solved! 🎉' : bPlan ? bPlan.title : 'Beginner method';
-    $('bText').textContent = current === SOLVED ? '' : bPlan ? bPlan.text
+    $('bText').textContent = current === SOLVED ? '' : bWaiting
+      ? `Keep going — finish your algorithm. Steps 1–${bPlan.stage - 1} stay done; I'll continue as soon as they're back in place.`
+      : bPlan ? bPlan.text
       : 'Hold the cube with yellow on top and green in front, and keep it that way. Scramble it, then press “Show next step”.';
     $('bAlg').textContent = current !== SOLVED && bPlan ? (grip === 'white' ? flipAlgText(bPlan.alg) : bPlan.alg) : '';
     $('bGrip').value = begGrip;
@@ -1321,6 +1323,8 @@ function renderGuide() {
   if (current === SOLVED) {
     guide.renderMessage('<span class="solved-banner">Solved!</span>', guide.moves.length ? `${guide.moves.length} moves` : '');
     if (guide.moves.length) guide.el.Prog.style.width = '100%';
+  } else if (beginner && bWaiting) {
+    guide.renderMessage('…', 'Keep going — finish your algorithm');
   } else if (!guide.active) {
     guide.renderMessage('–', solver.ready ? 'Scramble the cube, then press “Solve”.' : '');
   } else {
@@ -1353,7 +1357,7 @@ async function solveNow(reason) {
 
 function guideOnState(move) {
   if (guideMethod === 'beginner') {
-    if (current === SOLVED) { guide.clear(); renderGuide(); return; }
+    if (current === SOLVED) { guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
     if (!bPlan) { renderGuide(); return; }
     const onTrack = guide.active && guide.track(current);
     if (onTrack && guide.idx === guide.moves.length) { beginnerStep(); return; }   // step finished
@@ -1363,7 +1367,7 @@ function guideOnState(move) {
         const tw = twistPlan(userView(current), begGrip);
         if (tw) { bPlan = { ...bPlan, moves: tw }; guide.set(tw.map(flipMove), current); renderGuide(); return; }
       }
-      beginnerStep(); return;
+      beginnerReplan(); return;
     }
     renderGuide();
     return;
@@ -1602,8 +1606,24 @@ try { guideMethod = localStorage.getItem('micube.method') || 'beginner'; } catch
 let bPlan = null;
 
 function beginnerStep() {
+  bHold = 0; bWaiting = false;
   bPlan = beginnerPlan(current, begGrip);
   if (bPlan.stage === 9) guide.clear(); else guide.set(bPlan.moves.map(flipMove), current);
+  renderGuide();
+}
+
+/* Recalculate after the user went their own way. Algorithms often break earlier steps for a moment
+ * (R U R' U' lifts a cross edge and puts it back), so a step that looks undone is not taken as "start
+ * over" straight away: completed steps stay done until they've been broken for 15 turns. */
+let bHold = 0, bWaiting = false;
+const B_HOLD_TURNS = 15;
+function beginnerReplan() {
+  const np = beginnerPlan(current, begGrip);
+  if (bPlan && np.stage < bPlan.stage && np.stage !== 9 && bHold < B_HOLD_TURNS) {
+    bHold++; bWaiting = true; guide.clear(); renderGuide(); return;
+  }
+  bHold = 0; bWaiting = false; bPlan = np;
+  if (np.stage === 9) guide.clear(); else guide.set(np.moves.map(flipMove), current);
   renderGuide();
 }
 
@@ -3037,7 +3057,7 @@ $('bGrip').onchange = e => {
 document.querySelectorAll('#methodSeg button').forEach(b => b.onclick = () => {
   guideMethod = b.dataset.method;
   try { localStorage.setItem('micube.method', guideMethod); } catch (e) { /* ignore */ }
-  guide.clear(); bPlan = null; $('solveMsg').textContent = '';
+  guide.clear(); bPlan = null; bHold = 0; bWaiting = false; $('solveMsg').textContent = '';
   if (guideMethod === 'beginner' && current !== SOLVED) beginnerStep(); else renderGuide();
 });
 $('btnMarkSolved').onclick = async () => {

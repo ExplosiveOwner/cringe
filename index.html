@@ -448,13 +448,22 @@
           <input id="vsCodeIn" class="code-in" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters">
           <button id="vsJoin">Join game</button>
         </div>
+        <div class="row">
+          <select id="vsBotLevel">
+            <option value="beginner">Bot · Beginner (~90 s)</option>
+            <option value="improving" selected>Bot · Improving (~45 s)</option>
+            <option value="fast">Bot · Fast (~25 s)</option>
+            <option value="expert">Bot · Expert (~12 s)</option>
+          </select>
+          <button id="vsBot">Race the bot</button>
+        </div>
         <div class="msg" id="vsLobbyMsg"></div>
         <div class="msg">Both players need this page open with their smart cube connected. Phones connect directly to each
           other; the free PeerJS service is only used to find each other by the code.</div>
       </div>
       <div id="vsRoom" class="hidden">
         <div class="row" style="justify-content:space-between">
-          <div>Code <span class="big-code" id="vsCodeShow"></span></div>
+          <div><span id="vsCodeLbl">Code </span><span class="big-code" id="vsCodeShow"></span></div>
           <button id="vsLeave">Leave</button>
         </div>
         <div class="arena">
@@ -2148,6 +2157,66 @@ function makeMiniCube(container) {
   return new CubeView(holder);
 }
 
+/* Bot opponent: it plays through the same messages as a real player. It scrambles its cube, then
+ * solves it with the beginner method, pacing its turns (with short "thinking" pauses between steps)
+ * to land near its level's time. */
+const BOT_LEVELS = {
+  beginner: { name: 'Beginner', time: 90 }, improving: { name: 'Improving', time: 45 },
+  fast: { name: 'Fast', time: 25 }, expert: { name: 'Expert', time: 12 },
+};
+let botTimers = [];
+const botLater = (fn, ms) => botTimers.push(setTimeout(fn, ms));
+function botStop() { botTimers.forEach(clearTimeout); botTimers = []; }
+function botState(s, m) { vsOnData({ t: 'state', s, m: m ? [m] : null }); }
+
+function vsStartBot() {
+  const level = BOT_LEVELS[$('vsBotLevel').value] || BOT_LEVELS.improving;
+  try { localStorage.setItem('micube.botLevel', $('vsBotLevel').value); } catch (e) { /* ignore */ }
+  vsLeave(true);
+  const conn = { open: true, send: botReceive, close() { this.open = false; } };
+  Object.assign(vs, { peer: { destroy() {} }, conn, code: '', host: true, bot: level, score: [0, 0], phase: 'idle',
+    oppName: `Bot (${level.name})`, oppState: SOLVED });
+  vsLobbyMsg('');
+  vsRender();
+}
+
+function botReceive(m) {
+  if (!vs.bot) return;
+  if (m.t === 'round') {
+    botStop();
+    // scramble the bot's cube from solved, at a relaxed pace, then report ready
+    let st = SOLVED;
+    botState(st, null);
+    const moves = splitAlg(m.scramble);
+    moves.forEach((mv, i) => botLater(() => { st = applyMoves(st, mv); botState(st, mv); }, 600 + i * 160));
+    botLater(() => vsOnData({ t: 'ready', v: true }), 900 + moves.length * 160);
+  } else if (m.t === 'go') {
+    botStop();
+    const start = vs.oppState;
+    // the bot's solution: the beginner method, step by step (cube frame)
+    const seq = [], stepEnds = [];
+    let g = start;
+    for (let guard = 0; g !== SOLVED && guard < 80; guard++) {
+      const pl = beginnerPlan(g, 'yellow');
+      if (!pl.moves.length) break;
+      const cm = pl.moves.map(flipMove);
+      seq.push(...cm); stepEnds.push(seq.length);
+      g = applyMoves(g, cm.join(' '));
+    }
+    const total = vs.bot.time * 1000 * (0.85 + Math.random() * 0.3);      // ±15% around the level's time
+    const pause = total * 0.25 / Math.max(1, stepEnds.length);
+    const gap = total * 0.75 / Math.max(1, seq.length);
+    let t = 3000 + pause, st = start;                                      // 3 s countdown, then "inspect"
+    const t0 = performance.now() + 3000;
+    seq.forEach((mv, i) => {
+      t += gap * (0.6 + Math.random() * 0.8);
+      botLater(() => { st = applyMoves(st, mv); botState(st, mv); }, t);
+      if (stepEnds.includes(i + 1)) t += pause * (0.5 + Math.random());
+    });
+    botLater(() => vsOnData({ t: 'done', time: Math.round(performance.now() - t0) }), t + 50);
+  }
+}
+
 const vsName = () => ($('vsName').value.trim() || 'Player').slice(0, 16);
 const randCode = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => CODE_CHARS[b % CODE_CHARS.length]).join('');
 function peerOptions() {        // ?peer=host:port uses a self-hosted PeerServer (for testing)
@@ -2348,6 +2417,7 @@ function vsOnState(prev, moves) {
 
 function vsLeave(keepMsg) {
   cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
+  botStop(); vs.bot = null;
   try { if (vs.conn) vs.conn.close(); } catch (e) { /* ignore */ }
   try { if (vs.peer) vs.peer.destroy(); } catch (e) { /* ignore */ }
   Object.assign(vs, { peer: null, conn: null, code: '', phase: 'idle', oppName: '', oppState: SOLVED });
@@ -2365,7 +2435,10 @@ function vsRender() {
   if (!vsMeView) { vsMeView = makeMiniCube($('vsMeCube')); vsOppView = makeMiniCube($('vsOppCube')); }
   if (vsMeView.target !== current) vsMeView.paint(current);      // don't interrupt a turn animation
   if (vsOppView.target !== vs.oppState) vsOppView.paint(vs.oppState);
-  $('vsCodeShow').textContent = vs.code;
+  $('vsCodeShow').textContent = vs.bot ? `vs Bot · ${vs.bot.name}` : vs.code;
+  $('vsCodeShow').style.fontSize = vs.bot ? '18px' : '';
+  $('vsCodeShow').style.letterSpacing = vs.bot ? 'normal' : '';
+  $('vsCodeLbl').classList.toggle('hidden', !!vs.bot);
   $('vsMeName').textContent = vsName() + ' (you)';
   $('vsOppName').textContent = vs.conn && vs.conn.open ? (vs.oppName || 'Opponent') : 'Waiting…';
   const t = (v, ready) => v === undefined ? (ready ? 'ready ✓' : '') : v === null ? 'DNF' : fmt(v);
@@ -3030,6 +3103,8 @@ $('caseGrid').onclick = e => {
 try { $('vsName').value = localStorage.getItem('micube.name') || ''; } catch (e) { /* ignore */ }
 $('vsName').onchange = () => { try { localStorage.setItem('micube.name', vsName()); } catch (e) { /* ignore */ } };
 $('vsCreate').onclick = vsCreate;
+$('vsBot').onclick = vsStartBot;
+try { const lv = localStorage.getItem('micube.botLevel'); if (lv && BOT_LEVELS[lv]) $('vsBotLevel').value = lv; } catch (e) { /* ignore */ }
 $('vsJoin').onclick = vsJoin;
 $('vsCodeIn').onkeydown = e => { if (e.key === 'Enter') vsJoin(); };
 $('vsCodeIn').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };

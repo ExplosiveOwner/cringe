@@ -49,7 +49,7 @@
   /* 3D cube */
   .views { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
   .scene { --s: 1; width: calc(210px * var(--s)); height: calc(210px * var(--s)); perspective: calc(700px * var(--s));
-    touch-action: none; cursor: grab; flex: none; }
+    touch-action: none; cursor: grab; flex: none; margin: 0 auto; }
   .cube3d { position: relative; width: 120px; height: 120px; margin: calc((210px * var(--s) - 120px) / 2); transform-style: preserve-3d; }
   .net-toggle { display: none; font-size: 12px; padding: 2px 8px; }
   .cubie { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; transform-style: preserve-3d; }
@@ -165,6 +165,22 @@
     font-variant-numeric: tabular-nums; }
   .vs-timer.count { color: var(--warn); }
   .vs-score { text-align: center; color: var(--muted); font-weight: 700; margin-top: 6px; }
+  .vs-scramble { text-align: center; }
+  /* In a game the arena takes the whole width: the separate live cube panel is hidden. */
+  body.vs-room #liveSection { display: none; }
+  body.vs-room main { grid-template-columns: minmax(0, 1fr); max-width: 1100px; }
+  @media (min-width: 701px) {
+    body.vs-room .mini-scene { width: 220px; height: 220px; perspective: 900px; }
+    body.vs-room .cube3d.mini { margin: 50px; transform: scale(1.3) rotateX(-28deg) rotateY(-38deg); }
+    body.vs-room .vs-timer { font-size: 64px; }
+  }
+  @media (min-width: 1100px) {
+    body.vs-room .mini-scene { width: 320px; height: 320px; perspective: 1200px; }
+    body.vs-room .cube3d.mini { margin: 100px; transform: scale(2) rotateX(-28deg) rotateY(-38deg); }
+    body.vs-room .vs-timer { font-size: 96px; }
+    body.vs-room .pl-name { font-size: 20px; }
+    body.vs-room .pl-time { font-size: 20px; }
+  }
   .big-code { font: 800 26px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; color: var(--accent); }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
@@ -388,7 +404,8 @@
         </div>
         <div class="timer-note" id="vsNote"></div>
         <div id="vsScr" class="hidden" style="margin-top:10px">
-          <div class="scr-alg" id="vsAlg"></div>
+          <div class="scr-alg vs-scramble" id="vsAlg"></div>
+          <div id="vsGuide">
           <div class="next" style="margin-bottom:8px">
             <div class="mv" id="vNext" style="font-size:40px">&ndash;</div>
             <div class="sub" id="vSub"></div>
@@ -396,6 +413,7 @@
           <div class="moves" id="vMoves"></div>
           <div class="bar"><div id="vProg"></div></div>
           <div class="msg" id="vProgText"></div>
+          </div>
         </div>
         <div class="row" style="margin-top:12px;justify-content:center">
           <button class="primary" id="vsRound">Start round</button>
@@ -816,13 +834,11 @@ function prettyAlg(a) {
  * ------------------------------------------------------------------------- */
 const cube3d = document.getElementById('cube3d');
 const netEl = document.getElementById('net');
-const sticker3d = [];
 const stickerNet = [];
 
 /* The 3D cube is built from 26 cubies so a layer can rotate during a turn animation.
  * Coordinates: x right, y up, z towards the viewer (CSS y points down, hence -y). */
 const CUBIE = 40;
-const cubies = [];
 const PLANE_T = { U: 'rotateX(90deg)', D: 'rotateX(-90deg)', F: '', B: 'rotateY(180deg)', R: 'rotateY(90deg)', L: 'rotateY(-90deg)' };
 /** Position of the cubie carrying Kociemba facelet i of face f. */
 function faceletPos(f, i) {
@@ -836,33 +852,134 @@ function faceletPos(f, i) {
     case 'L': return [-1, 1 - r, c - 1];
   }
 }
-(function buildViews() {
-  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
-    if (!x && !y && !z) continue;
-    const el = document.createElement('div');
-    el.className = 'cubie';
-    const base = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
-    el.style.transform = base;
-    const planes = {};
-    const outside = { U: y === 1, D: y === -1, R: x === 1, L: x === -1, F: z === 1, B: z === -1 };
-    for (const f of FACES) {   // only the outward faces; caps fill the gap of a turning layer
-      if (!outside[f]) continue;
-      const pl = document.createElement('div');
-      pl.className = 'pl';
-      pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
-      el.appendChild(pl);
-      planes[f] = pl;
+const LAYER = { U: ['y', 1], D: ['y', -1], R: ['x', 1], L: ['x', -1], F: ['z', 1], B: ['z', -1] };
+const ROT = { U: ['Y', -1], D: ['Y', 1], R: ['X', 1], L: ['X', -1], F: ['Z', 1], B: ['Z', -1] };
+const OPPOSITE = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
+
+/** A 3D cube with turn animations. Used for the main cube and both cubes in the 1v1 arena. */
+class CubeView {
+  constructor(holder) {
+    this.holder = holder;
+    this.cubies = [];
+    this.st = [];
+    this.target = null;      // the state this view shows (or is animating towards)
+    this.anim = { queue: [], busy: false, timer: 0, startTimer: 0, moving: null, caps: null };
+    for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+      if (!x && !y && !z) continue;
+      const el = document.createElement('div');
+      el.className = 'cubie';
+      const base = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
+      el.style.transform = base;
+      const planes = {};
+      const outside = { U: y === 1, D: y === -1, R: x === 1, L: x === -1, F: z === 1, B: z === -1 };
+      for (const f of FACES) {   // only the outward faces; caps fill the gap of a turning layer
+        if (!outside[f]) continue;
+        const pl = document.createElement('div');
+        pl.className = 'pl';
+        pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
+        el.appendChild(pl);
+        planes[f] = pl;
+      }
+      holder.appendChild(el);
+      this.cubies.push({ el, x, y, z, base, planes });
     }
-    cube3d.appendChild(el);
-    cubies.push({ el, x, y, z, base, planes });
+    for (let fi = 0; fi < 6; fi++) for (let i = 0; i < 9; i++) {
+      const [x, y, z] = faceletPos(FACES[fi], i);
+      const sticker = document.createElement('div');
+      this.cubies.find(c => c.x === x && c.y === y && c.z === z).planes[FACES[fi]].appendChild(sticker);
+      this.st[fi * 9 + i] = sticker;
+    }
   }
-  for (let fi = 0; fi < 6; fi++) for (let i = 0; i < 9; i++) {
-    const [x, y, z] = faceletPos(FACES[fi], i);
-    const cb = cubies.find(c => c.x === x && c.y === y && c.z === z);
-    const st = document.createElement('div');
-    cb.planes[FACES[fi]].appendChild(st);
-    sticker3d[fi * 9 + i] = st;
+  paintNow(state) { for (let i = 0; i < 54; i++) this.st[i].style.backgroundColor = `var(--c${state[i]})`; }
+  /** Show a state at once (stops any animation). */
+  paint(state) { this.stop(); this.target = state; this.paintNow(state); }
+  /** A solid black square closing off the inside of the cube at a layer boundary. */
+  makeCap(axis, pos) {
+    const el = document.createElement('div');
+    el.className = 'cap';
+    const base = axis === 'x' ? `translate3d(${pos}px, 0, 0) rotateY(90deg)`
+      : axis === 'y' ? `translate3d(0, ${-pos}px, 0) rotateX(90deg)` : `translate3d(0, 0, ${pos}px)`;
+    el.style.transform = base;
+    this.holder.appendChild(el);
+    return { el, base };
   }
+  endAnim() {
+    const a = this.anim;
+    if (a.moving) for (const c of a.moving) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
+    if (a.caps) for (const el of a.caps) el.remove();
+    a.moving = null; a.caps = null;
+  }
+  stop() {
+    const a = this.anim;
+    clearTimeout(a.timer); clearTimeout(a.startTimer);
+    this.endAnim();
+    a.busy = false; a.queue.length = 0;
+  }
+  /* Turn animation: rotate the 9 cubies of the layer, then snap back and repaint with the new state. */
+  run() {
+    const a = this.anim;
+    if (a.queue.length > 5) {           // far behind (very fast turning): jump to the latest state
+      const last = a.queue[a.queue.length - 1];
+      a.queue.length = 0;
+      this.paintNow(last.s); a.busy = false; return;
+    }
+    const first = a.queue.shift();
+    if (!first) { a.busy = false; return; }
+    a.busy = true;
+    // Opposite faces commute, so turn them together. A middle-layer move (M/E/S) arrives as such a
+    // pair (e.g. M = R + L'), so it animates as one movement.
+    const items = [first];
+    if (a.queue[0] && a.queue[0].m[0] === OPPOSITE[first.m[0]]) items.push(a.queue.shift());
+    const fast = a.queue.length > 0;
+    const moving = [], caps = [];
+    let dur = 0;
+    for (const it of items) {
+      const f = it.m[0], [axis, val] = LAYER[f], [rAxis, sign] = ROT[f];
+      const amt = it.m.endsWith('2') ? 2 : it.m.endsWith("'") ? -1 : 1;
+      dur = Math.max(dur, (amt === 2 ? 1.5 : 1) * (fast ? 90 : 170));
+      const rot = `rotate${rAxis}(${sign * amt * 90}deg)`;
+      const turning = this.makeCap(axis, val * CUBIE / 2), still = this.makeCap(axis, val * CUBIE / 2);
+      caps.push(turning.el, still.el);
+      for (const c of this.cubies) if (c[axis] === val) moving.push({ c, rot });
+      moving.push({ c: turning, rot });
+    }
+    a.moving = moving.map(x => x.c); a.caps = caps;
+    void this.holder.offsetWidth;   // commit resting positions so the transition starts from there
+    for (const { c, rot } of moving) {
+      c.el.style.transition = `transform ${dur}ms ease-out`;
+      c.el.style.transform = `${rot} ${c.base}`;
+    }
+    a.timer = setTimeout(() => {
+      this.endAnim();
+      this.paintNow(items[items.length - 1].s);
+      this.run();
+    }, dur);
+  }
+  /** Show `state`, animating `moves` (made from `prev`) when animations are on. */
+  show(state, prev, moves) {
+    if (!anim.enabled || !prev || !moves || !moves.length || moves.includes('?') || this.target !== prev) {
+      this.paint(state); return;
+    }
+    this.target = state;
+    const a = this.anim;
+    let s = prev;
+    for (const m of moves) { s = applyMoves(s, m); a.queue.push({ m, s }); }
+    if (s !== state) { this.paint(state); return; }
+    if (!a.busy) {   // wait a moment so the second half of a middle-layer move can join
+      a.busy = true;
+      a.startTimer = setTimeout(() => this.run(), 40);
+    }
+  }
+}
+
+const mainView = new CubeView(cube3d);
+const sticker3d = mainView.st, cubies = mainView.cubies;
+const anim = mainView.anim;          // anim.enabled is the switch for every cube view
+anim.enabled = true;
+function paint3d(state) { mainView.paint(state); }
+function stopAnim() { mainView.stop(); }
+
+(function buildNet() {
   const origin = { U: [0, 3], L: [3, 0], F: [3, 3], R: [3, 6], B: [3, 9], D: [6, 3] };
   const cells = new Array(108).fill(null);
   for (let fi = 0; fi < 6; fi++) {
@@ -876,91 +993,10 @@ function faceletPos(f, i) {
   }
 })();
 
-function paint3d(state) {
-  for (let i = 0; i < 54; i++) sticker3d[i].style.backgroundColor = `var(--c${state[i]})`;
-}
-
-/* Turn animation: rotate the 9 cubies of the layer, then snap back and repaint with the new state. */
-const LAYER = { U: ['y', 1], D: ['y', -1], R: ['x', 1], L: ['x', -1], F: ['z', 1], B: ['z', -1] };
-const ROT = { U: ['Y', -1], D: ['Y', 1], R: ['X', 1], L: ['X', -1], F: ['Z', 1], B: ['Z', -1] };
-const anim = { queue: [], busy: false, timer: 0, startTimer: 0, moving: null, caps: null, enabled: true };
-const OPPOSITE = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'B', B: 'F' };
-
-/** A solid black square closing off the inside of the cube at a layer boundary. */
-function makeCap(axis, pos) {
-  const el = document.createElement('div');
-  el.className = 'cap';
-  const base = axis === 'x' ? `translate3d(${pos}px, 0, 0) rotateY(90deg)`
-    : axis === 'y' ? `translate3d(0, ${-pos}px, 0) rotateX(90deg)` : `translate3d(0, 0, ${pos}px)`;
-  el.style.transform = base;
-  cube3d.appendChild(el);
-  return { el, base };
-}
-
-function endAnim() {
-  if (anim.moving) for (const c of anim.moving) { c.el.style.transition = 'none'; c.el.style.transform = c.base; }
-  if (anim.caps) for (const el of anim.caps) el.remove();
-  anim.moving = null; anim.caps = null;
-}
-
-function stopAnim() {
-  clearTimeout(anim.timer); clearTimeout(anim.startTimer);
-  endAnim();
-  anim.busy = false; anim.queue.length = 0;
-}
-
-function runAnim() {
-  if (anim.queue.length > 5) {           // far behind (very fast turning): jump to the latest state
-    const last = anim.queue[anim.queue.length - 1];
-    anim.queue.length = 0;
-    paint3d(last.s); anim.busy = false; return;
-  }
-  const first = anim.queue.shift();
-  if (!first) { anim.busy = false; return; }
-  anim.busy = true;
-  // Opposite faces commute, so turn them together. A middle-layer move (M/E/S) arrives as such a
-  // pair (e.g. M = R + L'), so it animates as one movement.
-  const items = [first];
-  if (anim.queue[0] && anim.queue[0].m[0] === OPPOSITE[first.m[0]]) items.push(anim.queue.shift());
-  const fast = anim.queue.length > 0;
-  const moving = [], caps = [];
-  let dur = 0;
-  for (const it of items) {
-    const f = it.m[0], [axis, val] = LAYER[f], [rAxis, sign] = ROT[f];
-    const amt = it.m.endsWith('2') ? 2 : it.m.endsWith("'") ? -1 : 1;
-    dur = Math.max(dur, (amt === 2 ? 1.5 : 1) * (fast ? 90 : 170));
-    const rot = `rotate${rAxis}(${sign * amt * 90}deg)`;
-    const turning = makeCap(axis, val * CUBIE / 2), still = makeCap(axis, val * CUBIE / 2);
-    caps.push(turning.el, still.el);
-    for (const c of cubies) if (c[axis] === val) moving.push({ c, rot });
-    moving.push({ c: turning, rot });
-  }
-  anim.moving = moving.map(x => x.c); anim.caps = caps;
-  void cube3d.offsetWidth;   // commit resting positions so the transition starts from there
-  for (const { c, rot } of moving) {
-    c.el.style.transition = `transform ${dur}ms ease-out`;
-    c.el.style.transform = `${rot} ${c.base}`;
-  }
-  anim.timer = setTimeout(() => {
-    endAnim();
-    paint3d(items[items.length - 1].s);
-    runAnim();
-  }, dur);
-}
-
 /** Show `state`. If `moves` (from `prev`) is given and animation is on, the 3D cube animates the turns. */
 function render(state, prev, moves) {
   for (let i = 0; i < 54; i++) stickerNet[i].style.backgroundColor = `var(--c${state[i]})`;
-  if (!anim.enabled || !prev || !moves || !moves.length || moves.includes('?')) {
-    stopAnim(); paint3d(state); return;
-  }
-  let s = prev;
-  for (const m of moves) { s = applyMoves(s, m); anim.queue.push({ m, s }); }
-  if (s !== state) { stopAnim(); paint3d(state); return; }
-  if (!anim.busy) {   // wait a moment so the second half of a middle-layer move can join
-    anim.busy = true;
-    anim.startTimer = setTimeout(runAnim, 40);
-  }
+  mainView.show(state, prev, moves);
 }
 
 (function setupDrag() {
@@ -1864,30 +1900,7 @@ function makeMiniCube(container) {
   const holder = document.createElement('div');
   holder.className = 'cube3d mini';
   container.appendChild(holder);
-  const cbs = [], st = [];
-  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
-    if (!x && !y && !z) continue;
-    const el = document.createElement('div');
-    el.className = 'cubie';
-    el.style.transform = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
-    const outside = { U: y === 1, D: y === -1, R: x === 1, L: x === -1, F: z === 1, B: z === -1 }, planes = {};
-    for (const f of FACES) {
-      if (!outside[f]) continue;
-      const pl = document.createElement('div');
-      pl.className = 'pl';
-      pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
-      el.appendChild(pl); planes[f] = pl;
-    }
-    holder.appendChild(el);
-    cbs.push({ x, y, z, planes });
-  }
-  for (let fi = 0; fi < 6; fi++) for (let i = 0; i < 9; i++) {
-    const [x, y, z] = faceletPos(FACES[fi], i);
-    const sticker = document.createElement('div');
-    cbs.find(c => c.x === x && c.y === y && c.z === z).planes[FACES[fi]].appendChild(sticker);
-    st[fi * 9 + i] = sticker;
-  }
-  return { paint(s) { for (let i = 0; i < 54; i++) st[i].style.backgroundColor = `var(--c${s[i]})`; } };
+  return new CubeView(holder);
 }
 
 const vsName = () => ($('vsName').value.trim() || 'Player').slice(0, 16);
@@ -1964,7 +1977,12 @@ const vsNote = t => { $('vsNote').textContent = t; };
 function vsOnData(m) {
   if (!m || typeof m !== 'object') return;
   if (m.t === 'hi') { vs.oppName = String(m.name || 'Opponent').slice(0, 16); if (typeof m.s === 'string' && colorCountsOk(m.s)) vs.oppState = m.s; vsRender(); }
-  else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) { vs.oppState = m.s; if (vsOppView) vsOppView.paint(m.s); }
+  else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) {
+    const prev = vs.oppState;
+    vs.oppState = m.s;
+    const moves = Array.isArray(m.m) && m.m.every(x => typeof x === 'string' && /^[URFDLB]['2]?$/.test(x)) ? m.m : null;
+    if (vsOppView) vsOppView.show(m.s, prev, moves);
+  }
   else if (m.t === 'round' && typeof m.scramble === 'string') vsStartRound(m.scramble);
   else if (m.t === 'ready') { vs.oppReady = !!m.v; vsMaybeGo(); vsRender(); }
   else if (m.t === 'go') vsGo();
@@ -2071,9 +2089,9 @@ function vsEndRound(aborted) {
   vsRender();
 }
 
-function vsOnState(prev) {
-  vsSend({ t: 'state', s: current });
-  if (vsMeView) vsMeView.paint(current);
+function vsOnState(prev, moves) {
+  vsSend({ t: 'state', s: current, m: moves || null });
+  if (vsMeView) vsMeView.show(current, prev, moves);
   if (vs.phase === 'scrambling') {
     if (vs.busy) return;
     if (!vtrk.track(current)) { vsCheckReady(); vsReplan('Off track.'); return; }
@@ -2095,11 +2113,13 @@ function vsLeave(keepMsg) {
 
 function vsRender() {
   const inRoom = !!vs.peer && (vs.host || (vs.conn && vs.conn.open));
+  document.body.classList.toggle('vs-room', inRoom && mode === 'vs');
   $('vsLobby').classList.toggle('hidden', inRoom);
   $('vsRoom').classList.toggle('hidden', !inRoom);
   if (!inRoom) return;
   if (!vsMeView) { vsMeView = makeMiniCube($('vsMeCube')); vsOppView = makeMiniCube($('vsOppCube')); }
-  vsMeView.paint(current); vsOppView.paint(vs.oppState);
+  if (vsMeView.target !== current) vsMeView.paint(current);      // don't interrupt a turn animation
+  if (vsOppView.target !== vs.oppState) vsOppView.paint(vs.oppState);
   $('vsCodeShow').textContent = vs.code;
   $('vsMeName').textContent = vsName() + ' (you)';
   $('vsOppName').textContent = vs.conn && vs.conn.open ? (vs.oppName || 'Opponent') : 'Waiting…';
@@ -2110,7 +2130,9 @@ function vsRender() {
   $('vsMeTime').classList.toggle('win', done && vs.myTime != null && (vs.oppTime == null || vs.myTime < vs.oppTime));
   $('vsOppTime').classList.toggle('win', done && vs.oppTime != null && (vs.myTime == null || vs.oppTime < vs.myTime));
   $('vsScore').textContent = `${vs.score[0]} – ${vs.score[1]}`;
-  $('vsScr').classList.toggle('hidden', vs.phase !== 'scrambling');
+  const inRound = ['scrambling', 'countdown', 'running'].includes(vs.phase);
+  $('vsScr').classList.toggle('hidden', !inRound);
+  $('vsGuide').classList.toggle('hidden', vs.phase !== 'scrambling');
   $('vsAlg').textContent = vs.scramble;
   if (vs.phase === 'scrambling') {
     if (vs.busy || !vtrk.active) vtrk.renderMessage('…', 'Calculating…');
@@ -2286,7 +2308,7 @@ function onStateChange(state, move) {
   if (!replay.active) render(current, prev, moves);
   if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
   else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
-  else if (mode === 'vs') vsOnState(prev);
+  else if (mode === 'vs') vsOnState(prev, moves);
   else guideOnState(move || (moves && moves[0]));
 }
 
@@ -2302,6 +2324,7 @@ function onSolverReady() {
 function setMode(m) {
   mode = m;
   document.body.dataset.mode = m;
+  if (m !== 'vs') document.body.classList.remove('vs-room');
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === m));
   $('tab-guide').classList.toggle('hidden', m !== 'guide');
   $('tab-timer').classList.toggle('hidden', m !== 'timer');

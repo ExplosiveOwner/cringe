@@ -266,6 +266,24 @@
   .cap { background: var(--plastic); }
   .scene { filter: drop-shadow(0 18px 24px rgba(0, 0, 0, .35)); }
   :root[data-theme="light"] .scene { filter: drop-shadow(0 18px 22px rgba(30, 41, 80, .25)); }
+  /* charts (palette: reference categorical slots 1-3, validated for both surfaces) */
+  :root { --s1: #338ced; --s2: #e76624; --s3: #00a888; --chart-bg: #151a28; }
+  :root[data-theme="light"] { --s1: #257de0; --s2: #f47230; --s3: #00b894; --chart-bg: #ffffff; }
+  :root[data-theme="graphite"] { --chart-bg: #181b22; }
+  .chart { position: relative; width: 100%; }
+  .chart svg { display: block; width: 100%; overflow: visible; }
+  .chart .grid { stroke: var(--line); stroke-width: 1; }
+  .chart .axis { fill: var(--muted); font-size: 11px; font-family: var(--mono); }
+  .chart .lbl { fill: var(--text); font-size: 12px; font-weight: 600; }
+  .chart .empty { color: var(--muted); font-size: 14px; padding: 18px 0; }
+  .chart .tip { position: absolute; pointer-events: none; background: var(--bg); border: 1px solid var(--line); border-radius: 10px;
+    padding: 6px 10px; font-size: 12px; white-space: nowrap; box-shadow: var(--shadow); transform: translate(-50%, -110%); display: none; z-index: 2; }
+  .chart .tip b { font-family: var(--mono); }
+  .viz-legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--muted); align-items: center; }
+  .viz-legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .lg-line { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
+  .timer.insp { color: var(--warn); }
   /* settings dialog */
   dialog.sheet { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--bg); color: var(--text);
     width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: var(--shadow); }
@@ -370,6 +388,12 @@
     </div>
     <h3>Your data</h3>
     <div id="dataHome" class="msg" style="margin-top:0">Solves and progress are saved in this browser.</div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnExport">⬇ Export backup</button>
+      <button id="btnImport">⬆ Import backup</button>
+      <input type="file" id="importFile" accept="application/json,.json" class="hidden">
+    </div>
+    <div class="msg">Keep a backup file (e.g. in iCloud Drive or OneDrive) — browsers can clear site data, and a backup also moves your progress to another device.</div>
   </div>
 </dialog>
 
@@ -478,9 +502,14 @@
       <div class="row" style="justify-content:space-between">
         <h3 style="margin:0">Scramble</h3>
         <div class="row">
+          <button id="btnDaily" disabled>📅 Daily challenge</button>
           <button id="btnNewScramble" disabled>New scramble</button>
           <button id="btnAbort" class="hidden">Cancel solve</button>
         </div>
+      </div>
+      <div class="opts" style="margin-top:6px">
+        <label class="chk"><input type="checkbox" id="inspOn"> 15 s inspection (with voice at 8 and 12 s)</label>
+        <span id="dailyLine"></span>
       </div>
       <div class="scr-alg" id="scrAlg" style="margin-top:8px">&ndash;</div>
       <div id="scrGuide">
@@ -504,6 +533,23 @@
         <div class="tile"><div class="k">Mean</div><div class="v" id="stMean">–</div></div>
         <div class="tile"><div class="k">Solves</div><div class="v" id="stCount">0</div></div>
       </div>
+
+      <h3>Progress</h3>
+      <div class="row" style="justify-content:space-between;margin-bottom:6px">
+        <div class="seg" id="chartRange"><button data-n="25">Last 25</button><button data-n="100" class="active">Last 100</button><button data-n="0">All</button></div>
+        <div class="viz-legend">
+          <span><i class="lg-dot" style="background:var(--s1)"></i>Single</span>
+          <span><i class="lg-line" style="background:var(--s2)"></i>ao5</span>
+          <span><i class="lg-line" style="background:var(--s3)"></i>ao12</span>
+        </div>
+      </div>
+      <div class="chart" id="chart"></div>
+      <h3>Step times (CFOP splits)</h3>
+      <div class="viz-legend" style="margin-bottom:6px">
+        <span><i class="lg-dot" style="background:var(--s1)"></i>Last 12 solves</span>
+        <span><i class="lg-dot" style="background:var(--s2)"></i>Before that</span>
+      </div>
+      <div class="chart" id="splitChart"></div>
 
       <div id="detail" class="hidden">
         <h3 id="detailTitle">Solve</h3>
@@ -582,9 +628,11 @@
             <option value="improving" selected>Bot · Improving (~45 s)</option>
             <option value="fast">Bot · Fast (~25 s)</option>
             <option value="expert">Bot · Expert (~12 s)</option>
+            <option value="me">Bot · Matches you</option>
           </select>
           <button id="vsBot">Race the bot</button>
         </div>
+        <div class="row"><button id="vsGhost">👻 Race your best solve (ghost)</button></div>
         <div class="msg" id="vsLobbyMsg"></div>
         <div class="msg">Both players need this page open with their smart cube connected. Phones connect directly to each
           other; the free PeerJS service is only used to find each other by the code.</div>
@@ -1255,6 +1303,7 @@ function setStatus(text, kind) {
   $('dot').className = 'dot' + (kind ? ' ' + kind : '');
 }
 function fmt(ms) {
+  if (ms === Infinity) return 'DNF';
   if (ms == null || !isFinite(ms)) return '–';
   const cs = Math.floor(ms / 10), s = Math.floor(cs / 100), m = Math.floor(s / 60);
   const rest = `${s % 60}.${String(cs % 100).padStart(2, '0')}`;
@@ -1863,9 +1912,73 @@ function beginnerReplan() {
 // phase: idle -> scrambling -> ready -> running -> (saved) -> scrambling ...
 const timer = { phase: 'idle', scramble: '', target: null, t0: 0, rec: [], states: [], raf: 0, busy: false };
 
+/** Scramble applied: ready to solve (with the optional 15-second inspection countdown). */
+function enterReady() {
+  timer.phase = 'ready';
+  timer.inspT0 = 0;
+  cancelAnimationFrame(timer.inspRaf);
+  if (!$('inspOn').checked) return;
+  timer.inspT0 = performance.now();
+  const said = new Set();
+  const say = w => { try { if (prefs.effects && window.speechSynthesis) speechSynthesis.speak(new SpeechSynthesisUtterance(w)); } catch (e) { /* ignore */ } };
+  const loop = () => {
+    if (timer.phase !== 'ready' || !timer.inspT0) return;
+    const el = (performance.now() - timer.inspT0) / 1000;
+    if (el >= 8 && !said.has(8)) { said.add(8); say('Eight seconds'); }
+    if (el >= 12 && !said.has(12)) { said.add(12); say('Twelve seconds'); }
+    const t = $('timer');
+    t.className = 'timer insp';
+    t.textContent = el < 15 ? String(Math.ceil(15 - el)) : el < 17 ? '+2' : 'DNF';
+    timer.inspRaf = requestAnimationFrame(loop);
+  };
+  loop();
+}
+
+/* Daily challenge: the same scramble for everyone on a given date (seeded random moves). */
+const todayKey = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+function seededScramble(key) {
+  let h = 2166136261;
+  for (const ch of key) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  let a = h >>> 0;
+  const rnd = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const out = []; let last = '', prev = '';
+  while (out.length < 22) {
+    const f = FACES[Math.floor(rnd() * 6)];
+    if (f === last || (OPP[f] === last && prev === f)) continue;
+    out.push(f + ['', "'", '2'][Math.floor(rnd() * 3)]);
+    prev = last; last = f;
+  }
+  return out.join(' ');
+}
+function dailyStreak() {
+  const days = new Set(solves.filter(x => x.daily).map(x => x.daily));
+  const d = new Date();
+  if (!days.has(todayKey(d))) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (days.has(todayKey(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function renderDailyLine() {
+  const today = solves.find(x => x.daily === todayKey());
+  const streak = dailyStreak();
+  $('dailyLine').textContent = (today ? `📅 Today's daily: ${fmt(effTime(today))}` : '📅 Today\'s daily not done yet') + (streak ? ` · 🔥 ${streak}-day streak` : '');
+}
+async function startDaily() {
+  if (!solver.ready) return;
+  cancelRun();
+  timer.phase = 'scrambling';
+  timer.daily = todayKey();
+  timer.scramble = seededScramble(timer.daily);
+  timer.target = applyMoves(SOLVED, timer.scramble);
+  scr.clear();
+  renderTimer(`Daily challenge ${timer.daily} — the same scramble for everyone today.`);
+  await replanScramble();
+}
+
 async function newScramble() {
   if (!solver.ready) return;
   cancelRun();
+  timer.daily = null;
   timer.phase = 'scrambling';
   timer.scramble = '';
   scr.clear();
@@ -1894,7 +2007,7 @@ async function replanScramble(reason) {
   }
   timer.busy = false;
   if (timer.phase !== 'scrambling') return;
-  if (current === timer.target) timer.phase = 'ready';
+  if (current === timer.target) enterReady();
   else if (current !== from && !scr.track(current)) { replanScramble('Off track.'); return; }   // cube moved meanwhile
   renderTimer();
 }
@@ -1910,13 +2023,19 @@ function timerOnState(prev, moves) {
   if (timer.phase === 'scrambling') {
     if (timer.busy) return;
     const ok = scr.track(current);
-    if (current === timer.target) timer.phase = 'ready';
+    if (current === timer.target) enterReady();
     else if (!ok) { replanScramble('Off track.'); return; }
     renderTimer();
     return;
   }
   if (timer.phase === 'ready') {
     timer.phase = 'running';
+    timer.penalty = null;
+    if (timer.inspT0) {       // official rules: start after 15 s = +2, after 17 s = DNF
+      const insp = now - timer.inspT0;
+      timer.penalty = insp > 17000 ? 'dnf' : insp > 15000 ? 'plus2' : null;
+      timer.inspT0 = 0;
+    }
     timer.t0 = now;
     timer.states = [prev];
     timer.rec = [];
@@ -1965,11 +2084,17 @@ function finishSolve(total) {
     solve.ll[set] = { id, ok };
     addCaseEvent(id, { d: Date.now(), src: 'solve', ok: ok ? 1 : 0, t: p.exec, n: p.turns });
   }
-  const prevBest = solves.length ? Math.min(...solves.map(x => x.time)) : null;
+  if (timer.penalty === 'dnf') solve.dnf = true; else if (timer.penalty === 'plus2') solve.plus2 = true;
+  if (timer.daily) solve.daily = timer.daily;
+  const firstDaily = timer.daily && !solves.some(x => x.daily === timer.daily);
+  const finite = solves.map(effTime).filter(isFinite);
+  const prevBest = finite.length ? Math.min(...finite) : null;
   const prevBestAo5 = bestAo5();
   solves.push(solve);
   const newAo5 = aoN(solves, 5);
-  if (prevBest !== null && total < prevBest) setTimeout(() => celebrate(`New personal best! ${fmt(total)} 🏆`), 300);
+  timer.daily = null;
+  if (firstDaily) setTimeout(() => celebrate(`Daily challenge done! 🔥 ${dailyStreak()}-day streak`), 300);
+  else if (prevBest !== null && effTime(solve) < prevBest) setTimeout(() => celebrate(`New personal best! ${fmt(effTime(solve))} 🏆`), 300);
   else if (prevBestAo5 !== null && newAo5 !== null && newAo5 < prevBestAo5) setTimeout(() => celebrate(`New best average of 5: ${fmt(newAo5)} 🏆`), 300);
   else sfx.ding();
   saveSolves();
@@ -1986,6 +2111,8 @@ function renderTimer(note) {
   $('scrAlg').textContent = timer.scramble || '–';
   $('btnAbort').classList.toggle('hidden', timer.phase !== 'running');
   $('btnNewScramble').disabled = !solver.ready || timer.phase === 'running';
+  $('btnDaily').disabled = !solver.ready || timer.phase === 'running';
+  renderDailyLine();
   $('scrGuide').classList.toggle('hidden', timer.phase === 'running');
   t.className = 'timer' + (timer.phase === 'ready' ? ' ready' : timer.phase === 'running' ? ' running' : '');
 
@@ -2431,13 +2558,25 @@ const botLater = (fn, ms) => botTimers.push(setTimeout(fn, ms));
 function botStop() { botTimers.forEach(clearTimeout); botTimers = []; }
 function botState(s, m) { vsOnData({ t: 'state', s, m: Array.isArray(m) ? m : m ? [m] : null }); }
 
-function vsStartBot() {
-  const level = BOT_LEVELS[$('vsBotLevel').value] || BOT_LEVELS.improving;
+/** Your recent level: the mean of your last 12 finished solves (45 s if you have none yet). */
+function myLevelSec() {
+  const t = solves.map(effTime).filter(isFinite).slice(-12);
+  return t.length ? t.reduce((a, b) => a + b, 0) / t.length / 1000 : 45;
+}
+function vsStartGhost() {
+  const done = solves.filter(x => !x.dnf && x.moves && x.moves.length && x.scramble);
+  if (!done.length) { vsLobbyMsg('Do a timed solve first (Timer tab) — then you can race your best one.'); return; }
+  const best = done.reduce((a, b) => effTime(b) < effTime(a) ? b : a);
+  vsStartBot({ name: 'Ghost', ghost: best, label: `👻 Your best (${fmt(effTime(best))})` });
+}
+function vsStartBot(custom) {
+  const sel = $('vsBotLevel').value;
+  const level = custom && custom.name ? custom : sel === 'me' ? { name: 'Your level', time: myLevelSec() } : BOT_LEVELS[sel] || BOT_LEVELS.improving;
   try { localStorage.setItem('micube.botLevel', $('vsBotLevel').value); } catch (e) { /* ignore */ }
   vsLeave(true);
   const conn = { open: true, send: botReceive, close() { this.open = false; } };
   Object.assign(vs, { peer: { destroy() {} }, conn, code: '', host: true, bot: level, score: [0, 0], phase: 'idle',
-    oppName: `Bot (${level.name})`, oppState: SOLVED });
+    oppName: level.label || `Bot (${level.name})`, oppState: SOLVED });
   vsLobbyMsg('');
   vsRender();
 }
@@ -2452,6 +2591,18 @@ function botReceive(m) {
     const moves = splitAlg(m.scramble);
     moves.forEach((mv, i) => botLater(() => { st = applyMoves(st, mv); botState(st, mv); }, 600 + i * 160));
     botLater(() => vsOnData({ t: 'ready', v: true }), 900 + moves.length * 160);
+  } else if (m.t === 'go' && vs.bot.ghost) {
+    // the ghost replays your recorded solve with its real timing
+    botStop();
+    const g = vs.bot.ghost;
+    let st = vs.oppState;
+    for (const r of g.moves) {
+      const next = r.m === '?' ? r.s : applyMoves(st, r.m);
+      const mv = r.m === '?' ? null : r.m;
+      st = next;
+      botLater(() => botState(next, mv), 3000 + r.t);
+    }
+    botLater(() => vsOnData({ t: 'done', time: effTime(g) }), 3000 + g.time + 50);
   } else if (m.t === 'go') {
     botStop();
     const start = vs.oppState;
@@ -2576,7 +2727,7 @@ function vsOnData(m) {
 
 async function vsNewRound() {
   if (!vs.host || !vs.conn || !solver.ready) return;
-  const scramble = (await solver.scramble()).trim();
+  const scramble = vs.bot && vs.bot.ghost ? vs.bot.ghost.scramble : (await solver.scramble()).trim();
   vsSend({ t: 'round', scramble });
   vsStartRound(scramble);
 }
@@ -2755,16 +2906,18 @@ function bestAo5() {
   return best;
 }
 /** Average of n, WCA style: drop best and worst, mean of the rest. */
+/** A solve's time with inspection penalties: +2 adds 2 s, DNF counts as Infinity. */
+const effTime = x => x.dnf ? Infinity : x.time + (x.plus2 ? 2000 : 0);
 function aoN(list, n) {
   if (list.length < n) return null;
-  const s = list.slice(-n).map(x => x.time).sort((a, b) => a - b);
+  const s = list.slice(-n).map(effTime).sort((a, b) => a - b);
   const trim = Math.ceil(n * 0.05) || 1;
   const mid = s.slice(trim, n - trim);
   return mid.reduce((a, b) => a + b, 0) / mid.length;
 }
 
 function renderStats() {
-  const times = solves.map(s => s.time);
+  const times = solves.map(effTime).filter(isFinite);
   $('stBest').textContent = times.length ? fmt(Math.min(...times)) : '–';
   $('stAo5').textContent = fmt(aoN(solves, 5));
   $('stAo12').textContent = fmt(aoN(solves, 12));
@@ -2773,6 +2926,7 @@ function renderStats() {
   $('stBestAo5').textContent = fmt(best5);
   $('stMean').textContent = times.length ? fmt(times.reduce((a, b) => a + b, 0) / times.length) : '–';
   $('stCount').textContent = solves.length;
+  renderCharts();
 }
 
 function renderHistory() {
@@ -2784,12 +2938,102 @@ function renderHistory() {
     const turns = s.moves.length;
     const ao5 = aoN(solves.slice(0, i + 1), 5);
     const d = new Date(s.date);
-    html += `<tr data-id="${s.id}" class="${s.id === selectedId ? 'sel' : ''}"><td>${i + 1}</td><td><strong>${fmt(s.time)}</strong></td>` +
+    const tag = (s.plus2 ? '+' : '') + (s.daily ? ' 📅' : '');
+    html += `<tr data-id="${s.id}" class="${s.id === selectedId ? 'sel' : ''}"><td>${i + 1}</td><td><strong>${fmt(effTime(s))}</strong>${tag}</td>` +
       `<td>${fmt(ao5)}</td><td>${turns}</td><td>${(turns / Math.max(s.time / 1000, 0.01)).toFixed(2)}</td>` +
       `<td>${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</td></tr>`;
   }
   tbl.innerHTML = html;
 }
+
+/* ------------------------------ Charts ----------------------------------- */
+let chartN = 100;
+const svgEl = (tag, attrs) => `<${tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ')}/>`;
+function niceTicks(lo, hi, n = 4) {
+  const span = hi - lo || 1, step0 = span / n, mag = Math.pow(10, Math.floor(Math.log10(step0)));
+  const step = [1, 2, 2.5, 5, 10].map(k => k * mag).find(k => k >= step0);
+  const out = [];
+  const top = Math.ceil(hi / step) * step;     // the ticks always enclose every value
+  for (let v = Math.max(0, Math.floor(lo / step) * step); v <= top + 1e-9; v += step) out.push(+v.toFixed(3));
+  return out;
+}
+function renderCharts() {
+  if (mode !== 'timer') return;
+  renderProgressChart(); renderSplitChart();
+}
+function renderProgressChart() {
+  const box = $('chart');
+  const all = solves.map((x, i) => ({ i: i + 1, t: effTime(x), ao5: aoN(solves.slice(0, i + 1), 5), ao12: aoN(solves.slice(0, i + 1), 12) }));
+  const data = chartN ? all.slice(-chartN) : all;
+  if (data.filter(d => isFinite(d.t)).length < 2) { box.innerHTML = '<div class="empty">Do a few solves and your progress shows up here.</div>'; return; }
+  const W = Math.max(280, box.clientWidth), H = 220, L = 44, R = 46, T = 12, B = 26;
+  const vals = data.flatMap(d => [d.t, d.ao5, d.ao12]).filter(v => v != null && isFinite(v)).map(v => v / 1000);
+  const ticks = niceTicks(Math.min(...vals) * 0.92, Math.max(...vals) * 1.04);
+  const lo = ticks[0], hi = ticks[ticks.length - 1];
+  const x = i => L + (data.length === 1 ? 0 : (i - data[0].i) / (data[data.length - 1].i - data[0].i)) * (W - L - R);
+  const y = v => T + (1 - (v / 1000 - lo) / (hi - lo || 1)) * (H - T - B);
+  let g = '';
+  for (const t of ticks) g += svgEl('line', { class: 'grid', x1: L, x2: W - R, y1: y(t * 1000), y2: y(t * 1000) }) + `<text class="axis" x="${L - 6}" y="${y(t * 1000) + 4}" text-anchor="end">${t}s</text>`;
+  g += `<text class="axis" x="${L}" y="${H - 6}">#${data[0].i}</text><text class="axis" x="${W - R}" y="${H - 6}" text-anchor="end">#${data[data.length - 1].i}</text>`;
+  const path = key => { let d = '', on = false; for (const p of data) { const v = p[key]; if (v == null || !isFinite(v)) { on = false; continue; } d += (on ? 'L' : 'M') + x(p.i).toFixed(1) + ',' + y(v).toFixed(1); on = true; } return d; };
+  for (const [key, col] of [['ao12', 'var(--s3)'], ['ao5', 'var(--s2)']]) {
+    const d = path(key); if (!d) continue;
+    g += `<path d="${d}" fill="none" stroke="${col}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    const last = [...data].reverse().find(p => p[key] != null && isFinite(p[key]));
+    if (last) g += `<text class="lbl" x="${x(last.i) + 6}" y="${y(last[key]) + 4}">${key}</text>`;
+  }
+  for (const p of data) if (isFinite(p.t)) g += svgEl('circle', { cx: x(p.i).toFixed(1), cy: y(p.t).toFixed(1), r: 4, fill: 'var(--s1)', stroke: 'var(--chart-bg)', 'stroke-width': 2 });
+  g += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" stroke="var(--muted)" stroke-dasharray="3 3" style="display:none"/>`;
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Solve times over time with ao5 and ao12">${g}<rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent"/></svg><div class="tip"></div>`;
+  const svg = box.querySelector('svg'), tip = box.querySelector('.tip'), xh = box.querySelector('.xh');
+  svg.querySelector('rect').addEventListener('pointermove', e => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * W / r.width;
+    const p = data.reduce((a, b) => Math.abs(x(b.i) - px) < Math.abs(x(a.i) - px) ? b : a);
+    xh.setAttribute('x1', x(p.i)); xh.setAttribute('x2', x(p.i)); xh.style.display = '';
+    tip.innerHTML = `Solve #${p.i}: <b>${fmt(p.t)}</b>` + (p.ao5 != null ? ` · ao5 <b>${fmt(p.ao5)}</b>` : '') + (p.ao12 != null ? ` · ao12 <b>${fmt(p.ao12)}</b>` : '');
+    tip.style.display = 'block'; tip.style.left = (x(p.i) * r.width / W) + 'px'; tip.style.top = (y(isFinite(p.t) ? p.t : p.ao5 || 0) * r.height / H) + 'px';
+  });
+  svg.querySelector('rect').addEventListener('pointerleave', () => { tip.style.display = 'none'; xh.style.display = 'none'; });
+}
+function renderSplitChart() {
+  const box = $('splitChart');
+  const ok = solves.filter(x => !x.dnf && x.phases && x.phases.length === 7);
+  if (ok.length < 3) { box.innerHTML = '<div class="empty">After a few timed solves you\'ll see how long each step takes — and whether it\'s getting faster.</div>'; return; }
+  const groups = [['Cross', [0]], ['F2L', [1, 2, 3, 4]], ['OLL', [5]], ['PLL', [6]]];
+  const avg = (list, idx) => list.reduce((a, x) => a + idx.reduce((b, k) => b + x.phases[k].time, 0), 0) / list.length;
+  const recent = ok.slice(-12), earlier = ok.slice(0, -12);
+  const rows = groups.map(([name, idx]) => ({ name, r: avg(recent, idx), e: earlier.length ? avg(earlier, idx) : null }));
+  const W = Math.max(280, box.clientWidth), rowH = earlier.length ? 34 : 22, L = 56, R = 64, H = rows.length * (rowH + 12);
+  const max = Math.max(...rows.flatMap(r => [r.r, r.e || 0]));
+  const w = v => Math.max(2, v / max * (W - L - R));
+  let g = '';
+  rows.forEach((row, k) => {
+    const y0 = k * (rowH + 12);
+    g += `<text class="axis" x="${L - 8}" y="${y0 + rowH / 2 + 4}" text-anchor="end" style="font-family:var(--font);font-size:12px">${row.name}</text>`;
+    const bars = earlier.length ? [['r', 'var(--s1)', 0], ['e', 'var(--s2)', rowH / 2 + 1]] : [['r', 'var(--s1)', 0]];
+    for (const [key, col, dy] of bars) {
+      const h = earlier.length ? rowH / 2 - 1 : rowH;
+      g += `<rect class="bar" data-tip="${row.name} · ${key === 'r' ? 'last 12' : 'before'}: ${fmt(row[key])}" x="${L}" y="${y0 + dy}" width="${w(row[key])}" height="${h}" rx="4" fill="${col}"/>`;
+      g += `<text class="axis" x="${L + w(row[key]) + 6}" y="${y0 + dy + h / 2 + 4}">${fmt(row[key])}</text>`;
+    }
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Average time per solving step">${g}</svg><div class="tip"></div>`;
+  const tip = box.querySelector('.tip'), svg = box.querySelector('svg');
+  svg.querySelectorAll('.bar').forEach(b => {
+    b.addEventListener('pointerenter', () => {
+      const r = svg.getBoundingClientRect(), bb = b.getBBox();
+      tip.textContent = b.dataset.tip; tip.style.display = 'block';
+      tip.style.left = ((bb.x + bb.width / 2) * r.width / W) + 'px'; tip.style.top = (bb.y * r.height / H) + 'px';
+    });
+    b.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+  });
+}
+document.querySelectorAll('#chartRange button').forEach(b => b.onclick = () => {
+  chartN = Number(b.dataset.n);
+  document.querySelectorAll('#chartRange button').forEach(x => x.classList.toggle('active', x === b));
+  renderProgressChart();
+});
+window.addEventListener('resize', () => { clearTimeout(renderCharts.t); renderCharts.t = setTimeout(renderCharts, 150); });
 
 /* A middle-layer turn is reported as two opposite face turns (M = R + L'); show it as M/E/S again. */
 const SLICE_PAIRS = { "R L'": 'M', "R' L": "M'", 'R2 L2': 'M2', "U D'": 'E', "U' D": "E'", 'U2 D2': 'E2',
@@ -2940,6 +3184,7 @@ function setMode(m) {
     if (timer.phase === 'running' || timer.phase === 'ready') cancelRun();
     renderTrainTab();
   } else if (m === 'timer') {
+    setTimeout(renderCharts, 0);
     if (timer.phase === 'idle' && solver.ready) newScramble();
     else if (timer.phase === 'scrambling' && !timer.busy && scr.active && !scr.track(current)) replanScramble('Cube changed.');
     else if (timer.phase === 'ready' && current !== timer.target) { timer.phase = 'scrambling'; replanScramble('Cube changed.'); }
@@ -3385,7 +3630,9 @@ $('caseGrid').onclick = e => {
 try { $('vsName').value = localStorage.getItem('micube.name') || ''; } catch (e) { /* ignore */ }
 $('vsName').onchange = () => { try { localStorage.setItem('micube.name', vsName()); } catch (e) { /* ignore */ } };
 $('vsCreate').onclick = vsCreate;
-$('vsBot').onclick = vsStartBot;
+$('vsBot').onclick = () => vsStartBot();
+$('vsGhost').onclick = vsStartGhost;
+$('vsBotLevel').onfocus = () => { $('vsBotLevel').querySelector('[value=me]').textContent = `Bot · Matches you (~${Math.round(myLevelSec())} s)`; };
 try { const lv = localStorage.getItem('micube.botLevel'); if (lv && BOT_LEVELS[lv]) $('vsBotLevel').value = lv; } catch (e) { /* ignore */ }
 $('vsJoin').onclick = vsJoin;
 $('vsCodeIn').onkeydown = e => { if (e.key === 'Enter') vsJoin(); };
@@ -3442,7 +3689,7 @@ function applyPrefs() {
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) meta.content = prefs.theme === 'light' ? '#eef1f8' : '#0a0d16';
 }
-document.querySelectorAll('#themeChoice button').forEach(b => b.onclick = () => { prefs.theme = b.dataset.v; savePrefs(); applyPrefs(); });
+document.querySelectorAll('#themeChoice button').forEach(b => b.onclick = () => { prefs.theme = b.dataset.v; savePrefs(); applyPrefs(); renderCharts(); });
 document.querySelectorAll('#cubeChoice button').forEach(b => b.onclick = () => { prefs.cube = b.dataset.v; savePrefs(); applyPrefs(); });
 $('sfxClicks').onchange = e => { prefs.clicks = e.target.checked; savePrefs(); if (prefs.clicks) sfx.click(); };
 $('sfxEffects').onchange = e => { prefs.effects = e.target.checked; savePrefs(); if (prefs.effects) sfx.ding(); };
@@ -3517,6 +3764,39 @@ function confetti() {
   requestAnimationFrame(frame);
 }
 function celebrate(text) { sfx.fanfare(); confetti(); toast(text); }
+
+$('btnDaily').onclick = startDaily;
+try { $('inspOn').checked = localStorage.getItem('micube.insp') === 'on'; } catch (e) { /* ignore */ }
+$('inspOn').onchange = e => { try { localStorage.setItem('micube.insp', e.target.checked ? 'on' : 'off'); } catch (err) { /* ignore */ } };
+
+/* Backup: every micube.* key in one JSON file. */
+function exportData() {
+  const data = {};
+  for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith('micube.')) data[k] = localStorage.getItem(k); }
+  const blob = new Blob([JSON.stringify({ app: 'smart-cube', version: 1, exported: new Date().toISOString(), data }, null, 1)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = `smart-cube-backup-${todayKey()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  toast('Backup saved ✓');
+}
+async function importData(file) {
+  try {
+    const j = JSON.parse(await file.text());
+    if (j.app !== 'smart-cube' || !j.data || typeof j.data !== 'object') throw new Error('not a Smart Cube backup');
+    const keys = Object.keys(j.data).filter(k => k.startsWith('micube.') && typeof j.data[k] === 'string');
+    if (!confirm(`Restore this backup from ${String(j.exported || '').slice(0, 10)}? It replaces the solves and progress in this browser.`)) return;
+    for (const k of keys) localStorage.setItem(k, j.data[k]);
+    location.reload();
+  } catch (e) { alert('Could not import: ' + e.message); }
+}
+$('btnExport').onclick = exportData;
+$('btnImport').onclick = () => $('importFile').click();
+$('importFile').onchange = e => { const f = e.target.files[0]; if (f) importData(f); e.target.value = ''; };
+$('btnSettings').addEventListener('click', () => {
+  const cases = Object.values(prog).filter(x => x.ev && x.ev.length).length;
+  $('dataHome').textContent = `${solves.length} timed solves, ${cases} algorithm cases practised, ${tuStats.correct} turn-practice answers — saved in this browser.`;
+});
 
 $('netToggle').onclick = () => {
   const v = document.querySelector('.views');

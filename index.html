@@ -231,7 +231,8 @@
       </div>
       <div id="bPanel" class="hidden">
         <ol class="stages" id="bStages"></ol>
-        <div class="msg" style="margin:-4px 0 10px">Hold the cube with <strong>yellow on top</strong> and <strong>green in front</strong> the whole time — don't rotate it.</div>
+        <div class="opts" style="margin:-6px 0 8px"><label>Grip after the flower <select id="bGrip"><option value="white">White on top</option><option value="yellow">Yellow on top</option></select></label></div>
+        <div class="msg" id="bHold" style="margin:0 0 10px"></div>
         <div class="b-step">
           <div class="b-title" id="bTitle"></div>
           <div class="msg" id="bText" style="margin-top:4px"></div>
@@ -608,16 +609,25 @@ function algTurns(a) {
 /* Beginner-method algorithms (yellow on top, white on the bottom). Each case is set up by undoing
  * its algorithm from a solved cube, so doing the algorithm solves the cube again. */
 const BEGINNER_DATA = [
-  { id: 'b-corner-right', name: 'White corner', nick: 'white facing right', subset: 'step 3 · white corners', algs: ["R U R' U'"] },
-  { id: 'b-corner-up', name: 'White corner', nick: 'white facing up', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U'"] },
-  { id: 'b-corner-front', name: 'White corner', nick: 'white facing front', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U' R U R' U' R U R' U'"] },
-  { id: 'b-mid-right', name: 'Middle edge', nick: 'to the right', subset: 'step 4 · middle layer', algs: ["U R U' R' U' F' U F"] },
-  { id: 'b-mid-left', name: 'Middle edge', nick: 'to the left', subset: 'step 4 · middle layer', algs: ["U' L' U L U F U' F'"] },
+  // `white`: the version for holding white on top after the flower (algs still in the yellow-up frame;
+  // shown flipped they read R' D' R D ×1/3/5 and R U R' U' ×2/4).
+  { id: 'b-corner-right', name: 'White corner', nick: 'white facing right', subset: 'step 3 · white corners', algs: ["R U R' U'"],
+    white: { id: 'b-corner-right-w', nick: 'white facing right', algs: ["L' U' L U"] } },
+  { id: 'b-corner-up', name: 'White corner', nick: 'white facing up', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U'"],
+    white: { id: 'b-corner-down-w', nick: 'white facing down', algs: ["L' U' L U L' U' L U L' U' L U"] } },
+  { id: 'b-corner-front', name: 'White corner', nick: 'white facing front', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U' R U R' U' R U R' U'"],
+    white: { id: 'b-corner-front-w', nick: 'white facing front', algs: ["L' U' L U L' U' L U L' U' L U L' U' L U L' U' L U"] } },
+  { id: 'b-mid-right', name: 'Middle edge', nick: 'to the right', subset: 'step 4 · middle layer', algs: ["U R U' R' U' F' U F"],
+    white: { nick: 'to the left' } },
+  { id: 'b-mid-left', name: 'Middle edge', nick: 'to the left', subset: 'step 4 · middle layer', algs: ["U' L' U L U F U' F'"],
+    white: { nick: 'to the right' } },
   { id: 'b-ycross', name: 'Yellow cross', nick: '', subset: 'step 5 · yellow cross', algs: ["F R U R' U' F'"] },
   { id: 'b-yedges', name: 'Yellow edges', nick: 'Sune', subset: 'step 6 · yellow edges', algs: ["R U R' U R U2 R'"] },
   { id: 'b-ycorners', name: 'Place yellow corners', nick: '', subset: 'step 7 · place corners', algs: ["U R U' L' U R' U' L"] },
-  { id: 'b-twist-right', name: 'Twist corner', nick: 'yellow facing right', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D"] },
-  { id: 'b-twist-front', name: 'Twist corner', nick: 'yellow facing front', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D R' D' R D R' D' R D"] },
+  { id: 'b-twist-right', name: 'Twist corner', nick: 'yellow facing right', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D"],
+    white: { id: 'b-twist-right-w', algs: ["L D L' D' L D L' D'"] } },
+  { id: 'b-twist-front', name: 'Twist corner', nick: 'yellow facing front', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D R' D' R D R' D' R D"],
+    white: { id: 'b-twist-front-w', algs: ["L D L' D' L D L' D' L D L' D' L D L' D'"] } },
 ];
 const CASES = { beg: [], oll: [], pll: [] };
 const CASE_BY_ID = new Map();
@@ -634,11 +644,19 @@ function buildCases() {
     }
   }
   SOLVED_SIG = { oll: ollSig(SOLVED), pll: pllSig(SOLVED) };
-  for (const d of BEGINNER_DATA) {
-    const algs = d.algs.map(normAlg);
-    const c = { ...d, set: 'beg', algs, state: stateAfter(invertAlg(algs[0])), turns: algTurns(algs[0]) };
-    CASES.beg.push(c); CASE_BY_ID.set(c.id, c);
-  }
+  buildBeginnerCases();
+}
+/** Beginner cases depend on the grip (white on top uses R' D' R D style algorithms). */
+function buildBeginnerCases() {
+  for (const c of CASES.beg) CASE_BY_ID.delete(c.id);
+  CASES.beg = BEGINNER_DATA.map(d => {
+    const v = typeof begGrip !== 'undefined' && begGrip === 'white' && d.white ? { ...d, ...d.white } : d;
+    const algs = v.algs.map(normAlg);
+    const c = { ...v, set: 'beg', algs, state: stateAfter(invertAlg(algs[0])), turns: algTurns(algs[0]) };
+    delete c.white;
+    CASE_BY_ID.set(c.id, c);
+    return c;
+  });
 }
 const caseLabel = c => c.name.replace(' Permutation', '-perm') + (c.nick ? ` · ${c.nick}` : '');
 /** Which OLL/PLL case is `state` in, given the cross is on `crossFace`? Returns an id, 'skip', or null. */
@@ -1046,7 +1064,9 @@ let guideBusy = false;
 
 function renderGuide() {
   const beginner = guideMethod === 'beginner';
-  guide.view = beginner ? flipMove : (m => m);
+  // Plans are worked out yellow-up; the cube's own frame is white-up, so a white-up grip needs no renaming.
+  const grip = beginner && bPlan ? gripOf(bPlan.stage) : 'yellow';
+  guide.view = beginner && grip === 'yellow' ? flipMove : (m => m);
   document.querySelectorAll('#methodSeg button').forEach(b => b.classList.toggle('active', b.dataset.method === guideMethod));
   $('bPanel').classList.toggle('hidden', !beginner);
   $('btnSolve').textContent = beginner ? 'Show next step' : 'Solve current state';
@@ -1056,7 +1076,12 @@ function renderGuide() {
     $('bTitle').textContent = current === SOLVED ? 'Solved! 🎉' : bPlan ? bPlan.title : 'Beginner method';
     $('bText').textContent = current === SOLVED ? '' : bPlan ? bPlan.text
       : 'Hold the cube with yellow on top and green in front, and keep it that way. Scramble it, then press “Show next step”.';
-    $('bAlg').textContent = current !== SOLVED && bPlan ? bPlan.alg : '';
+    $('bAlg').textContent = current !== SOLVED && bPlan ? (grip === 'white' ? flipAlgText(bPlan.alg) : bPlan.alg) : '';
+    $('bGrip').value = begGrip;
+    $('bHold').innerHTML = !bPlan || bPlan.stage === 1
+      ? (begGrip === 'white' ? 'Hold <strong>yellow on top</strong>, green in front for the flower — then <strong>white on top</strong>, green in front for the rest. Don\'t rotate the cube during a step.'
+        : 'Hold the cube with <strong>yellow on top</strong> and <strong>green in front</strong> the whole time — don\'t rotate it.')
+      : `Now hold <strong>${grip} on top</strong>, green in front — don't rotate the cube.`;
   }
   if (current === SOLVED) {
     guide.renderMessage('<span class="solved-banner">Solved!</span>', guide.moves.length ? `${guide.moves.length} moves` : '');
@@ -1100,7 +1125,7 @@ function guideOnState(move) {
     if (!onTrack) {
       // Mid-twist the bottom looks scrambled, so keep twisting rather than restarting from step 1.
       if (bPlan.stage === 8) {
-        const tw = twistPlan(userView(current));
+        const tw = twistPlan(userView(current), begGrip);
         if (tw) { bPlan = { ...bPlan, moves: tw }; guide.set(tw.map(flipMove), current); renderGuide(); return; }
       }
       beginnerStep(); return;
@@ -1182,6 +1207,11 @@ const MID_LEFT = X => `U' ${LEFT_OF[X]}' U ${LEFT_OF[X]} U ${X} U' ${X}'`;
 const FRUF = "F R U R' U' F'", SUNE = "R U R' U R U2 R'";
 const NIKLAS = X => `U ${RIGHT_OF[X]} U' ${LEFT_OF[X]}' U ${RIGHT_OF[X]}' U' ${LEFT_OF[X]}`;
 const TWIST = "R' D' R D";
+// White-up grip variants (written in the yellow-up frame; shown flipped they read R' D' R D and R U R' U').
+const LEFTY = X => `${LEFT_OF[X]}' U' ${LEFT_OF[X]} U`;
+const TWIST_W = "L D L' D'";
+/** Turn yellow-up notation into white-up notation (and back): top<->bottom, right<->left. */
+const flipAlgText = t => t.replace(/[URFDLB]/g, f => Z2_FACE[f]);
 const rep = (alg, n) => Array(n).fill(alg).join(' ');
 const shortest = cands => cands.sort((a, b) => splitAlg(a.alg).length - splitAlg(b.alg).length)[0];
 
@@ -1205,16 +1235,19 @@ function searchIncrease(st, measure, maxDepth) {
 }
 
 /** Twist the yellow corners: R' D' R D on the front-right corner, U to bring the next one there. */
-function twistPlan(st) {
-  const moves = []; let t = st, corners = 0;
+function twistPlan(st, grip) {
+  // Yellow up: R' D' R D on the front-right top corner. White up: R U R' U' on the front-right bottom
+  // corner, which in the yellow-up frame is L D L' D' on the front-left top corner (sticker 6).
+  const alg = grip === 'white' ? TWIST_W : TWIST, at = grip === 'white' ? 6 : 8;
+  const moves = []; let t = st;
   for (let guard = 0; guard < 12 && t !== SOLVED; guard++) {
-    if (t[8] !== 'U') {
-      const r = [2, 4].find(n => falg(t, rep(TWIST, n))[8] === 'U');
+    if (t[at] !== 'U') {
+      const r = [2, 4].find(n => falg(t, rep(alg, n))[at] === 'U');
       if (!r) return null;
-      moves.push(...splitAlg(rep(TWIST, r))); t = falg(t, rep(TWIST, r)); corners++;
+      moves.push(...splitAlg(rep(alg, r))); t = falg(t, rep(alg, r));
       continue;
     }
-    const k = [1, 2, 3].find(n => falg(t, UK[n])[8] !== 'U' && [0, 2, 6, 8].some(i => t[i] !== 'U'));
+    const k = [1, 2, 3].find(n => falg(t, UK[n])[at] !== 'U' && [0, 2, 6, 8].some(i => t[i] !== 'U'));
     if (k) { moves.push(UK[k]); t = falg(t, UK[k]); continue; }
     const f = [1, 2, 3].find(n => falg(t, UK[n]) === SOLVED);
     if (!f) return null;
@@ -1224,8 +1257,10 @@ function twistPlan(st) {
 }
 
 /** Work out which beginner step the cube is at and the moves for it (in the user's grip). */
-function beginnerPlan(cubeState) {
+function beginnerPlan(cubeState, grip = 'yellow') {
   const st = userView(cubeState);
+  const W = grip === 'white';
+  const T = (yellow, white) => W ? white : yellow;
   if (st === SOLVED) return { stage: 9, title: 'Solved!', text: '', alg: '', moves: [] };
   const cc = crossCount(st);
   if (cc < 4 && petals(st) + cc < 4) {
@@ -1238,27 +1273,32 @@ function beginnerPlan(cubeState) {
       const t = falg(st, UK[k]);
       const X = SIDES4.find(Y => t[U_EDGE[Y]] === 'D' && t[SIDE_TOP[Y]] === Y);
       if (X) return { stage: 2, title: 'Step 2 · White cross', alg: `${UK[k] ? UK[k] + ' ' : ''}${X}2`, moves: splitAlg(`${UK[k]} ${X}2`),
-        text: 'Turn the top until a petal\'s side colour matches the centre below it, then turn that face twice (180°) to bring the white edge down.' };
+        text: T('Turn the top until a petal\'s side colour matches the centre below it, then turn that face twice (180°) to bring the white edge down.',
+          'Turn the bottom until a petal\'s side colour matches the centre above it, then turn that face twice (180°) to bring the white edge up.') };
     }
     return { stage: 2, title: 'Step 2 · White cross', alg: '', moves: searchIncrease(st, crossCount, 5) || [], text: 'Bring the next white edge down to the bottom.' };
   }
   const cs = solvedSet(st, D_CORNERS);
   if (countTrue(cs) < 4) {
     const cands = [];
+    const pattern = W ? LEFTY : SEXY;    // white up: R' D' R D, yellow up: R U R' U'
     for (let k = 0; k < 4; k++) for (const X of SIDES4) for (let r = 1; r <= 5; r++) {
-      const alg = normAlg(`${UK[k]} ${rep(SEXY(X), r)}`), t = falg(st, alg);
+      const alg = normAlg(`${UK[k]} ${rep(pattern(X), r)}`), t = falg(st, alg);
       const after = solvedSet(t, D_CORNERS);
       if (crossCount(t) === 4 && keeps(cs, after) && countTrue(after) > countTrue(cs)) { cands.push({ alg, X, r, k }); break; }
     }
     const best = shortest(cands);
     if (best) return { stage: 3, title: 'Step 3 · White corners', moves: splitAlg(best.alg),
-      alg: `${best.k ? UK[best.k] + ' then ' : ''}(${SEXY(best.X)}) ×${best.r}`,
-      text: 'Turn the top so a white corner sits above its spot, then repeat the 4-move pattern until the corner drops in with white facing down.' };
+      alg: `${best.k ? UK[best.k] + ' then ' : ''}(${pattern(best.X)}) ×${best.r}`,
+      text: T('Turn the top so a white corner sits above its spot, then repeat the 4-move pattern until the corner drops in with white facing down.',
+        'Turn the bottom so a white corner sits below its spot, then repeat the 4-move pattern until the corner goes up with white facing up.') };
     // A wrong or twisted corner in the bottom: X U X' U' on its slot lifts it out (X = the slot's right-hand face).
     const sides = D_CORNERS[cs.findIndex(v => !v)].map(x => x.f).filter(f => f !== 'D');
     const slotFace = sides.find(Y => sides.includes(LEFT_OF[Y])) || 'R';
-    return { stage: 3, title: 'Step 3 · White corners', alg: SEXY(slotFace), moves: splitAlg(SEXY(slotFace)),
-      text: 'A white corner is stuck in the bottom layer in the wrong place or twisted. Do the pattern once to bring it back to the top.' };
+    const lift = (W ? LEFTY : SEXY)(slotFace);
+    return { stage: 3, title: 'Step 3 · White corners', alg: lift, moves: splitAlg(lift),
+      text: T('A white corner is stuck in the bottom layer in the wrong place or twisted. Do the pattern once to bring it back to the top.',
+        'A white corner is stuck in the top layer in the wrong place or twisted. Do the pattern once to bring it back to the bottom.') };
   }
   const ms = solvedSet(st, MID_EDGES);
   if (countTrue(ms) < 4) {
@@ -1270,11 +1310,13 @@ function beginnerPlan(cubeState) {
     const best = shortest(cands);
     if (best) return { stage: 4, title: 'Step 4 · Middle layer', moves: splitAlg(best.alg),
       alg: `${best.k ? UK[best.k] + ' then ' : ''}${best.fn(best.X)}`,
-      text: `Line up a top edge without yellow with its centre, then insert it to the ${best.side}.` };
+      text: T(`Line up a top edge without yellow with its centre, then insert it to the ${best.side}.`,
+        `Line up a bottom edge without yellow with its centre, then insert it to the ${best.side === 'right' ? 'left' : 'right'}.`) };
     const i = ms.findIndex(v => !v);
     const X = SIDES4.find(Y => { const e = MID_EDGES[i].map(x => x.f); return e.includes(Y) && e.includes(RIGHT_OF[Y]); }) || 'F';
     return { stage: 4, title: 'Step 4 · Middle layer', alg: MID_RIGHT(X), moves: splitAlg(MID_RIGHT(X)),
-      text: 'A middle edge is in the wrong place or flipped. Insert any top edge there to push it out to the top.' };
+      text: T('A middle edge is in the wrong place or flipped. Insert any top edge there to push it out to the top.',
+        'A middle edge is in the wrong place or flipped. Insert any bottom edge there to push it out to the bottom.') };
   }
   const yc = yCross(st);
   if (yc < 3) {
@@ -1286,7 +1328,8 @@ function beginnerPlan(cubeState) {
     }
     if (!best) best = { alg: FRUF, k: 0 };
     return { stage: 5, title: 'Step 5 · Yellow cross', moves: splitAlg(best.alg), alg: `${best.k ? UK[best.k] + ' then ' : ''}${FRUF}`,
-      text: `You have ${shape} of yellow on top. Turn the top as shown, then do the algorithm.` };
+      text: T(`You have ${shape} of yellow on top. Turn the top as shown, then do the algorithm.`,
+        `You have ${shape} of yellow on the bottom. Turn the bottom as shown, then do the algorithm.`) };
   }
   if (edgesMatched(st) < 4) {
     const cands = [];
@@ -1298,7 +1341,8 @@ function beginnerPlan(cubeState) {
     const ok = cands.filter(a => { const t = falg(st, a); return twoLayers(t) && yCross(t) === 3 && edgesMatched(t) === 4; })
       .sort((a, b) => splitAlg(a).length - splitAlg(b).length)[0];
     return { stage: 6, title: 'Step 6 · Yellow edges', moves: ok ? splitAlg(ok) : [], alg: ok && ok.includes('R') ? SUNE : (ok || ''),
-      text: 'Make the side colours of the yellow edges match their centres. Turn the top as shown and use this algorithm.' };
+      text: T('Make the side colours of the yellow edges match their centres. Turn the top as shown and use this algorithm.',
+        'Make the side colours of the yellow edges match their centres. Turn the bottom as shown and use this algorithm.') };
   }
   if (cornersPlaced(st) < 4) {
     const cands = [];
@@ -1310,16 +1354,20 @@ function beginnerPlan(cubeState) {
     return { stage: 7, title: 'Step 7 · Place yellow corners', moves: splitAlg(best.alg), alg: NIKLAS(best.X),
       text: 'Move the yellow corners to their correct spots (they can still be twisted). Repeat the algorithm until all 4 are in place.' };
   }
-  return { stage: 8, title: 'Step 8 · Twist yellow corners', moves: twistPlan(st) || [], alg: `${TWIST}  (repeat)`,
-    text: 'Repeat R\' D\' R D until the front-right top corner has yellow on top, then turn only the top (U) to bring the next corner there. Don\'t rotate the cube! The bottom looks scrambled until the very end — that\'s normal.' };
+  return { stage: 8, title: 'Step 8 · Twist yellow corners', moves: twistPlan(st, grip) || [], alg: `${W ? TWIST_W : TWIST}  (repeat)`,
+    text: T('Repeat R\' D\' R D until the front-right top corner has yellow on top, then turn only the top (U) to bring the next corner there. Don\'t rotate the cube! The bottom looks scrambled until the very end — that\'s normal.',
+      'Repeat R U R\' U\' until the front-right bottom corner has yellow facing down, then turn only the bottom (D) to bring the next corner there. Don\'t rotate the cube! The white side looks scrambled until the very end — that\'s normal.') };
 }
 
+let begGrip = 'white';   // after the white flower: 'white' (white on top) or 'yellow' (yellow on top throughout)
+try { begGrip = localStorage.getItem('micube.grip') || 'white'; } catch (e) { /* ignore */ }
+const gripOf = stage => stage === 1 ? 'yellow' : begGrip;
 let guideMethod = 'beginner';
 try { guideMethod = localStorage.getItem('micube.method') || 'beginner'; } catch (e) { /* ignore */ }
 let bPlan = null;
 
 function beginnerStep() {
-  bPlan = beginnerPlan(current);
+  bPlan = beginnerPlan(current, begGrip);
   if (bPlan.stage === 9) guide.clear(); else guide.set(bPlan.moves.map(flipMove), current);
   renderGuide();
 }
@@ -1468,7 +1516,12 @@ function renderTimer(note) {
 /* ------------------------------ Trainer ---------------------------------- */
 const trk = new Tracker('t');
 // Holding yellow on top (cube flipped with z2) swaps right/left and top/bottom; front/back stay.
-trk.view = m => llConj() ? { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' }[m[0]] + m.slice(1) : m;
+trk.view = m => trFlipNames() ? flipMove(m) : m;
+// Beginner cases always have yellow as the last layer; their grip comes from the beginner setting.
+const trConj = () => train.set === 'beg' ? 'z2' : llConj();
+const trCross = () => train.set === 'beg' ? 'U' : userCross();
+const trFlipNames = () => train.set === 'beg' ? begGrip !== 'white' : !!llConj();
+const trAlgText = a => train.set === 'beg' && begGrip === 'white' ? flipAlgText(prettyAlg(a)) : prettyAlg(a);
 const train = { phase: 'off', set: 'beg', caseId: null, targetAlg: '', target: null, t0: 0, rec: [], busy: false, raf: 0 };
 const trainOpts = { pick: 'smart', top: 'yellow', hide: false };
 try { Object.assign(trainOpts, JSON.parse(localStorage.getItem('micube.train.v1') || '{}')); } catch (e) { /* ignore */ }
@@ -1483,7 +1536,7 @@ const COLOR_FLIP = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' };
 
 function diagramHTML(c) {
   const layout = [null, 47, 46, 45, null, 36, 0, 1, 2, 11, 37, 3, 4, 5, 10, 38, 6, 7, 8, 9, null, 18, 19, 20, null];
-  const map = ch => llConj() ? COLOR_FLIP[ch] : ch;
+  const map = ch => c.set === 'beg' || llConj() ? COLOR_FLIP[ch] : ch;
   return layout.map(i => {
     if (i === null) return '<div></div>';
     const ch = c.state[i];
@@ -1510,7 +1563,7 @@ async function trainNext(id) {
   $('trAlg').dataset.revealed = '';
   const c = CASE_BY_ID.get(train.caseId);
   if (c.set !== train.set) { train.set = c.set; renderTrainTab(); }
-  const conj = llConj();
+  const conj = trConj();
   const auf = c.set === 'beg' ? '' : AUF[Math.floor(Math.random() * 4)];   // beginner cases: fixed position
   const core = normAlg(`${conj} ${invertAlg(prefAlg(c))} ${auf} ${conj}`);
   train.targetAlg = normAlg(core + ' ' + reorientFor(core));
@@ -1543,7 +1596,7 @@ async function trainReplan(reason) {
 }
 
 function trainDone(s) {
-  const X = userCross(), Y = OPP[X];
+  const X = trCross(), Y = OPP[X];
   if (!(crossDone(s, X) && slotCount(s, X) === 4)) return false;
   if (train.set === 'oll') return faceDone(s, Y);
   return s === SOLVED || [Y, Y + '2', Y + "'"].some(a => applyMoves(s, a) === SOLVED);
@@ -1609,14 +1662,14 @@ function renderTrainer(note) {
   const alg = $('trAlg');
   const hide = trainOpts.hide && train.phase !== 'done' && !alg.dataset.revealed;
   alg.className = 'tr-alg' + (hide ? ' hid' : '');
-  alg.textContent = hide ? 'Algorithm hidden — tap to reveal' : prettyAlg(prefAlg(c));
+  alg.textContent = hide ? 'Algorithm hidden — tap to reveal' : trAlgText(prefAlg(c));
   $('trSetup').classList.toggle('hidden', train.phase === 'running' || train.phase === 'done');
   $('trTimer').className = 'timer' + (train.phase === 'ready' ? ' ready' : train.phase === 'running' ? ' running' : '');
   if (train.phase === 'setup') {
     if (train.busy || !trk.active) trk.renderMessage('…', 'Calculating…'); else trk.renderSteps();
   }
   const defaults = {
-    setup: `Set up the case: do these moves (hold ${trainOpts.top} on top, green in front).`,
+    setup: `Set up the case: do these moves (hold ${train.set === 'beg' ? begGrip : trainOpts.top} on top, green in front).`,
     ready: 'Ready! Do the algorithm — the timer starts on your first turn.',
     running: 'Go!', done: '',
   };
@@ -1665,7 +1718,7 @@ function renderCaseDetail() {
         <div class="msg" style="margin-top:2px">Best ${fmt(trainTimes.length ? Math.min(...trainTimes) : null)} · average ${fmt(avg)}</div>
       </div>
     </div>
-    <div style="margin-top:10px">${c.algs.map((a, i) => `<label class="alg-opt"><input type="radio" name="algpick" value="${i}" ${i === pref ? 'checked' : ''}> <span>${prettyAlg(a)}</span></label>`).join('')}</div>
+    <div style="margin-top:10px">${c.algs.map((a, i) => `<label class="alg-opt"><input type="radio" name="algpick" value="${i}" ${i === pref ? 'checked' : ''}> <span>${c.set === train.set ? trAlgText(a) : prettyAlg(a)}</span></label>`).join('')}</div>
     <div class="row" style="margin-top:10px">
       <button class="primary" id="cdTrain">Train this case</button>
       <button id="cdStar">${p.star ? '★ Starred' : '☆ Star'}</button>
@@ -1679,7 +1732,7 @@ function renderCaseDetail() {
 
 function renderTrainTab() {
   document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('active', b.dataset.set === train.set));
-  $('trPick').value = trainOpts.pick; $('trTop').value = trainOpts.top; $('trHide').checked = trainOpts.hide;
+  $('trPick').value = trainOpts.pick; $('trTop').value = train.set === 'beg' ? begGrip : trainOpts.top; $('trHide').checked = trainOpts.hide;
   renderLegend(); renderCaseGrid(); renderCaseDetail(); renderTrainer();
 }
 
@@ -1910,10 +1963,26 @@ async function connect(showAll) {
       ],
       optionalServices: [SVC_DATA, SVC_CTRL],
     });
-    device.addEventListener('gattserverdisconnected', onDisconnected);
-    setStatus('Connecting to ' + (device.name || 'cube') + '…', 'busy');
     log('Selected ' + (device.name || device.id));
-    const server = await device.gatt.connect();
+    await setupDevice(device);
+  } catch (e) {
+    log('Connect failed: ' + e.name + ': ' + e.message);
+    setStatus(e.name === 'NotFoundError' && /cancel/i.test(e.message) ? 'Not connected' : 'Error: ' + e.message, '');
+  }
+}
+
+const LAST_DEVICE_KEY = 'micube.lastDevice';
+let userDisconnect = false, reconnectTimer = 0;
+
+/** Connect to an already chosen cube and subscribe to its state (also used for automatic reconnects). */
+async function setupDevice(dev) {
+  device = dev;
+  if (!dev._micubeListener) { dev.addEventListener('gattserverdisconnected', onDisconnected); dev._micubeListener = true; }
+  clearTimeout(reconnectTimer);
+  userDisconnect = false;
+  {
+    setStatus('Connecting to ' + (dev.name || 'cube') + '…', 'busy');
+    const server = await withTimeout(dev.gatt.connect(), 15000, 'The cube did not answer — twist it to wake it up.');
     let svc;
     try { svc = await server.getPrimaryService(SVC_DATA); }
     catch (e) { device.gatt.disconnect(); throw new Error(`"${device.name || 'This device'}" isn't a Xiaomi/Giiker cube (no cube data service found).`); }
@@ -1942,21 +2011,59 @@ async function connect(showAll) {
     $('btnConnect').disabled = true;
     $('btnConnectAll').disabled = true;
     $('btnDisconnect').disabled = false;
+    try { localStorage.setItem(LAST_DEVICE_KEY, JSON.stringify({ id: device.id, name: device.name || '' })); } catch (e) { /* ignore */ }
+  }
+}
+
+function withTimeout(promise, ms, msg) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+}
+
+/** After a refresh: reconnect to the remembered cube without the chooser, where the browser allows it. */
+async function autoReconnect() {
+  let last = null;
+  try { last = JSON.parse(localStorage.getItem(LAST_DEVICE_KEY) || 'null'); } catch (e) { /* ignore */ }
+  if (!last || !navigator.bluetooth) return;
+  if (!navigator.bluetooth.getDevices) {
+    setStatus('Tap “Connect cube” to reconnect' + (last.name ? ` to ${last.name}` : ''), '');
+    log('This browser cannot reconnect without the device chooser (no getDevices).');
+    return;
+  }
+  let devs = [];
+  try { devs = await navigator.bluetooth.getDevices(); } catch (e) { log('getDevices failed: ' + e.message); }
+  const dev = devs.find(d => d.id === last.id) || (last.name && devs.find(d => d.name === last.name));
+  if (!dev) { setStatus('Tap “Connect cube” to reconnect', ''); return; }
+  log('Reconnecting to remembered cube ' + (dev.name || dev.id));
+  tryReconnect(dev, 0);
+}
+
+/** Keep trying to reconnect (cube asleep / out of range) with growing pauses; twisting the cube wakes it. */
+async function tryReconnect(dev, attempt) {
+  if (userDisconnect || (device && device !== dev) || (dev.gatt && dev.gatt.connected && stateChar)) return;
+  try {
+    await setupDevice(dev);
   } catch (e) {
-    log('Connect failed: ' + e.name + ': ' + e.message);
-    setStatus(e.name === 'NotFoundError' && /cancel/i.test(e.message) ? 'Not connected' : 'Error: ' + e.message, '');
+    log('Reconnect attempt ' + (attempt + 1) + ' failed: ' + e.message);
+    try { if (dev.gatt.connected) dev.gatt.disconnect(); } catch (err) { /* ignore */ }
+    if (attempt >= 20) { setStatus('Could not reconnect — tap “Connect cube”', ''); return; }
+    setStatus(`Reconnecting to ${dev.name || 'cube'}… twist the cube to wake it`, 'busy');
+    reconnectTimer = setTimeout(() => tryReconnect(dev, attempt + 1), Math.min(2000 + attempt * 1000, 10000));
   }
 }
 
 function onDisconnected() {
   log('Disconnected');
-  setStatus('Disconnected', '');
   stateChar = null; ctrlWrite = null;
   $('btnConnect').disabled = false;
   $('btnConnectAll').disabled = false;
   $('btnDisconnect').disabled = true;
   $('btnMarkSolved').disabled = true;
   $('battery').textContent = '';
+  if (userDisconnect || !device) { setStatus('Disconnected', ''); return; }
+  // Dropped by itself (cube asleep, out of range): reconnect automatically.
+  setStatus(`Connection lost — reconnecting to ${device.name || 'cube'}…`, 'busy');
+  const dev = device;
+  reconnectTimer = setTimeout(() => tryReconnect(dev, 0), 1000);
 }
 
 function handlePacket(dv) {
@@ -2024,8 +2131,19 @@ function handlePacket(dv) {
  * ------------------------------------------------------------------------- */
 $('btnConnect').onclick = () => connect(false);
 $('btnConnectAll').onclick = () => connect(true);
-$('btnDisconnect').onclick = () => device && device.gatt.connected && device.gatt.disconnect();
+$('btnDisconnect').onclick = () => {
+  userDisconnect = true; clearTimeout(reconnectTimer);
+  if (device && device.gatt.connected) device.gatt.disconnect();
+  try { localStorage.removeItem(LAST_DEVICE_KEY); } catch (e) { /* ignore */ }   // don't auto-connect next time
+};
 $('btnSolve').onclick = () => guideMethod === 'beginner' ? beginnerStep() : solveNow();
+$('bGrip').onchange = e => {
+  begGrip = e.target.value;
+  try { localStorage.setItem('micube.grip', begGrip); } catch (err) { /* ignore */ }
+  buildBeginnerCases();
+  if (guideMethod === 'beginner' && current !== SOLVED && bPlan) beginnerStep(); else renderGuide();
+  if (mode === 'train') { if (train.set === 'beg' && train.phase !== 'off') stopTraining(); renderTrainTab(); }
+};
 document.querySelectorAll('#methodSeg button').forEach(b => b.onclick = () => {
   guideMethod = b.dataset.method;
   try { localStorage.setItem('micube.method', guideMethod); } catch (e) { /* ignore */ }
@@ -2075,7 +2193,14 @@ document.querySelectorAll('#setSeg button').forEach(b => b.onclick = () => {
 $('btnTrain').onclick = () => { if (train.phase === 'off') { $('trAlg').dataset.revealed = ''; trainNext(); } else stopTraining(); };
 $('btnSkip').onclick = () => { $('trAlg').dataset.revealed = ''; trainNext(); };
 $('trPick').onchange = e => { trainOpts.pick = e.target.value; saveTrainOpts(); };
-$('trTop').onchange = e => { trainOpts.top = e.target.value; saveTrainOpts(); renderTrainTab(); if (train.phase !== 'off') trainNext(train.caseId); };
+$('trTop').onchange = e => {
+  if (train.set === 'beg') {      // for beginner cases this is the same setting as the guide's grip
+    begGrip = e.target.value;
+    try { localStorage.setItem('micube.grip', begGrip); } catch (err) { /* ignore */ }
+    buildBeginnerCases(); if (train.phase !== 'off') stopTraining(); renderTrainTab(); renderGuide(); return;
+  }
+  trainOpts.top = e.target.value; saveTrainOpts(); renderTrainTab(); if (train.phase !== 'off') trainNext(train.caseId);
+};
 $('trHide').onchange = e => { trainOpts.hide = e.target.checked; saveTrainOpts(); renderTrainer(); };
 $('trAlg').onclick = () => { $('trAlg').dataset.revealed = '1'; renderTrainer(); };
 $('caseGrid').onclick = e => {
@@ -2146,6 +2271,7 @@ if (typeof Cube === 'undefined') {
   buildCases();
   setMode(['timer', 'train'].includes(saved) ? saved : 'guide');
   solver.init();
+  autoReconnect();
 }
 </script>
 </body>

@@ -303,7 +303,7 @@
     <!-- Algorithms: trainer + memorisation tracking -->
     <div id="tab-train" class="hidden">
       <div class="row" style="justify-content:space-between">
-        <div class="seg" id="setSeg"><button data-set="oll" class="active">OLL</button><button data-set="pll">PLL</button></div>
+        <div class="seg" id="setSeg"><button data-set="beg">Beginner</button><button data-set="oll" class="active">OLL</button><button data-set="pll">PLL</button></div>
         <div class="legend" id="legend"></div>
       </div>
 
@@ -605,7 +605,21 @@ function algTurns(a) {
   }
   return n;
 }
-const CASES = { oll: [], pll: [] };
+/* Beginner-method algorithms (yellow on top, white on the bottom). Each case is set up by undoing
+ * its algorithm from a solved cube, so doing the algorithm solves the cube again. */
+const BEGINNER_DATA = [
+  { id: 'b-corner-right', name: 'White corner', nick: 'white facing right', subset: 'step 3 · white corners', algs: ["R U R' U'"] },
+  { id: 'b-corner-up', name: 'White corner', nick: 'white facing up', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U'"] },
+  { id: 'b-corner-front', name: 'White corner', nick: 'white facing front', subset: 'step 3 · white corners', algs: ["R U R' U' R U R' U' R U R' U' R U R' U' R U R' U'"] },
+  { id: 'b-mid-right', name: 'Middle edge', nick: 'to the right', subset: 'step 4 · middle layer', algs: ["U R U' R' U' F' U F"] },
+  { id: 'b-mid-left', name: 'Middle edge', nick: 'to the left', subset: 'step 4 · middle layer', algs: ["U' L' U L U F U' F'"] },
+  { id: 'b-ycross', name: 'Yellow cross', nick: '', subset: 'step 5 · yellow cross', algs: ["F R U R' U' F'"] },
+  { id: 'b-yedges', name: 'Yellow edges', nick: 'Sune', subset: 'step 6 · yellow edges', algs: ["R U R' U R U2 R'"] },
+  { id: 'b-ycorners', name: 'Place yellow corners', nick: '', subset: 'step 7 · place corners', algs: ["U R U' L' U R' U' L"] },
+  { id: 'b-twist-right', name: 'Twist corner', nick: 'yellow facing right', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D"] },
+  { id: 'b-twist-front', name: 'Twist corner', nick: 'yellow facing front', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D R' D' R D R' D' R D"] },
+];
+const CASES = { beg: [], oll: [], pll: [] };
 const CASE_BY_ID = new Map();
 const SIG_INDEX = { oll: new Map(), pll: new Map() };
 let SOLVED_SIG = {};
@@ -620,6 +634,11 @@ function buildCases() {
     }
   }
   SOLVED_SIG = { oll: ollSig(SOLVED), pll: pllSig(SOLVED) };
+  for (const d of BEGINNER_DATA) {
+    const algs = d.algs.map(normAlg);
+    const c = { ...d, set: 'beg', algs, state: stateAfter(invertAlg(algs[0])), turns: algTurns(algs[0]) };
+    CASES.beg.push(c); CASE_BY_ID.set(c.id, c);
+  }
 }
 const caseLabel = c => c.name.replace(' Permutation', '-perm') + (c.nick ? ` · ${c.nick}` : '');
 /** Which OLL/PLL case is `state` in, given the cross is on `crossFace`? Returns an id, 'skip', or null. */
@@ -656,6 +675,17 @@ function caseStatus(id) {
 }
 const STATUS_TEXT = { learned: 'Learned', learning: 'Learning', notknown: 'Not known', unseen: 'Not practised' };
 const prefAlg = c => c.algs[(prog[c.id] && prog[c.id].pref) || 0] || c.algs[0];
+/** Show a repeated pattern compactly, e.g. "(R U R' U') ×3". */
+function prettyAlg(a) {
+  const t = splitAlg(a);
+  for (const len of [4]) {
+    if (t.length > len && t.length % len === 0) {
+      const unit = t.slice(0, len).join(' ');
+      if (Array(t.length / len).fill(unit).join(' ') === a) return `(${unit}) ×${t.length / len}`;
+    }
+  }
+  return a;
+}
 
 /* ---------------------------------------------------------------------------
  * Rendering: 3D CSS cube + 2D net
@@ -1439,7 +1469,7 @@ function renderTimer(note) {
 const trk = new Tracker('t');
 // Holding yellow on top (cube flipped with z2) swaps right/left and top/bottom; front/back stay.
 trk.view = m => llConj() ? { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' }[m[0]] + m.slice(1) : m;
-const train = { phase: 'off', set: 'oll', caseId: null, targetAlg: '', target: null, t0: 0, rec: [], busy: false, raf: 0 };
+const train = { phase: 'off', set: 'beg', caseId: null, targetAlg: '', target: null, t0: 0, rec: [], busy: false, raf: 0 };
 const trainOpts = { pick: 'smart', top: 'yellow', hide: false };
 try { Object.assign(trainOpts, JSON.parse(localStorage.getItem('micube.train.v1') || '{}')); } catch (e) { /* ignore */ }
 const saveTrainOpts = () => { try { localStorage.setItem('micube.train.v1', JSON.stringify({ ...trainOpts, set: train.set })); } catch (e) { /* ignore */ } };
@@ -1481,7 +1511,8 @@ async function trainNext(id) {
   const c = CASE_BY_ID.get(train.caseId);
   if (c.set !== train.set) { train.set = c.set; renderTrainTab(); }
   const conj = llConj();
-  const core = normAlg(`${conj} ${invertAlg(prefAlg(c))} ${AUF[Math.floor(Math.random() * 4)]} ${conj}`);
+  const auf = c.set === 'beg' ? '' : AUF[Math.floor(Math.random() * 4)];   // beginner cases: fixed position
+  const core = normAlg(`${conj} ${invertAlg(prefAlg(c))} ${auf} ${conj}`);
   train.targetAlg = normAlg(core + ' ' + reorientFor(core));
   train.target = applyMoves(SOLVED, train.targetAlg);
   train.phase = 'setup';
@@ -1492,16 +1523,19 @@ async function trainNext(id) {
 }
 
 async function trainReplan(reason) {
-  if (train.busy) return;
-  train.busy = true;
+  if (train.busy) { train.again = true; return; }   // a newer request: redo once the current one finishes
+  train.busy = true; train.again = false;
   renderTrainer((reason ? reason + ' ' : '') + 'Calculating set-up moves…');
-  const from = current;
+  const from = current, targetAlg = train.targetAlg;
+  let moves;
   try {
-    trk.set(await pathTo(from, train.targetAlg), from);
+    moves = await pathTo(from, targetAlg);
   } catch (e) {
     train.busy = false; renderTrainer('Error: ' + e.message); return;
   }
   train.busy = false;
+  if (train.again || targetAlg !== train.targetAlg) { if (train.phase === 'setup') trainReplan(); return; }
+  trk.set(moves, from);
   if (train.phase !== 'setup') return;
   if (current === train.target) train.phase = 'ready';
   else if (current !== from && !trk.track(current)) { trainReplan('Off track.'); return; }
@@ -1575,7 +1609,7 @@ function renderTrainer(note) {
   const alg = $('trAlg');
   const hide = trainOpts.hide && train.phase !== 'done' && !alg.dataset.revealed;
   alg.className = 'tr-alg' + (hide ? ' hid' : '');
-  alg.textContent = hide ? 'Algorithm hidden — tap to reveal' : prefAlg(c);
+  alg.textContent = hide ? 'Algorithm hidden — tap to reveal' : prettyAlg(prefAlg(c));
   $('trSetup').classList.toggle('hidden', train.phase === 'running' || train.phase === 'done');
   $('trTimer').className = 'timer' + (train.phase === 'ready' ? ' ready' : train.phase === 'running' ? ' running' : '');
   if (train.phase === 'setup') {
@@ -1631,7 +1665,7 @@ function renderCaseDetail() {
         <div class="msg" style="margin-top:2px">Best ${fmt(trainTimes.length ? Math.min(...trainTimes) : null)} · average ${fmt(avg)}</div>
       </div>
     </div>
-    <div style="margin-top:10px">${c.algs.map((a, i) => `<label class="alg-opt"><input type="radio" name="algpick" value="${i}" ${i === pref ? 'checked' : ''}> <span>${a}</span></label>`).join('')}</div>
+    <div style="margin-top:10px">${c.algs.map((a, i) => `<label class="alg-opt"><input type="radio" name="algpick" value="${i}" ${i === pref ? 'checked' : ''}> <span>${prettyAlg(a)}</span></label>`).join('')}</div>
     <div class="row" style="margin-top:10px">
       <button class="primary" id="cdTrain">Train this case</button>
       <button id="cdStar">${p.star ? '★ Starred' : '☆ Star'}</button>

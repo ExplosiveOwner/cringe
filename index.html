@@ -183,6 +183,9 @@
   .vs-timer.count { color: var(--warn); }
   .vs-score { text-align: center; color: var(--muted); font-weight: 700; margin-top: 6px; }
   .vs-scramble { text-align: center; }
+  .match-sum { background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 12px; margin-top: 12px; text-align: center; }
+  .match-sum h4 { margin: 0 0 8px; font-size: 18px; }
+  .match-sum table { max-width: 420px; margin: 0 auto; }
   /* In a game the arena takes the whole width: the separate live cube panel is hidden. */
   body.vs-room #liveSection { display: none; }
   body.vs-room main { grid-template-columns: minmax(0, 1fr); max-width: 1100px; }
@@ -648,6 +651,7 @@
         <div class="row">
           <input id="vsCodeIn" class="code-in" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters">
           <button id="vsJoin">Join game</button>
+          <button id="vsWatch">👀 Watch</button>
         </div>
         <div class="row">
           <select id="vsBotLevel">
@@ -666,7 +670,7 @@
       </div>
       <div id="vsRoom" class="hidden">
         <div class="row" style="justify-content:space-between">
-          <div><span id="vsCodeLbl">Code </span><span class="big-code" id="vsCodeShow"></span></div>
+          <div><span id="vsCodeLbl">Code </span><span class="big-code" id="vsCodeShow"></span> <span class="msg" id="vsWatchers" style="margin-left:8px"></span></div>
           <button id="vsLeave">Leave</button>
         </div>
         <div class="arena">
@@ -687,7 +691,9 @@
           <div class="msg" id="vProgText"></div>
           </div>
         </div>
+        <div class="match-sum hidden" id="vsMatch"></div>
         <div class="row" style="margin-top:12px;justify-content:center">
+          <select id="vsBo" title="Match format"><option value="1">Single rounds</option><option value="5">Best of 5</option></select>
           <button class="primary" id="vsRound">Start round</button>
           <button id="vsGiveUp" class="hidden">Give up</button>
         </div>
@@ -2861,7 +2867,7 @@ const PEERJS_URL = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js
 const PEER_PREFIX = 'micube-1v1-';
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';     // no 0/O, 1/I look-alikes
 const vtrk = new Tracker('v');
-const vs = { peer: null, conn: null, code: '', host: false, oppName: '', oppState: SOLVED, phase: 'idle',
+const vs = { specs: [], watch: null, bo: 1, roundNo: 0, rounds: [], peer: null, conn: null, code: '', host: false, oppName: '', oppState: SOLVED, phase: 'idle',
   scramble: '', target: null, meReady: false, oppReady: false, t0: 0, myTime: undefined, oppTime: undefined,
   score: [0, 0], raf: 0, busy: false, countTimer: 0 };
 let vsMeView = null, vsOppView = null;
@@ -2999,7 +3005,15 @@ async function vsCreate() {
       try {
         const peer = await openPeer(PEER_PREFIX + code);
         Object.assign(vs, { peer, code, host: true, score: [0, 0], phase: 'idle', oppName: '' });
-        peer.on('connection', c => { if (vs.conn && vs.conn.open) { c.on('open', () => c.close()); return; } vsSetupConn(c); });
+        peer.on('connection', c => {
+          const first = m => {
+            c.off('data', first);
+            if (m && m.t === 'hi' && m.role === 'spectator') { specAdd(c, m); return; }
+            if (vs.conn && vs.conn.open) { c.close(); return; }
+            vsSetupConn(c, true); vsOnData(m);
+          };
+          c.on('data', first);
+        });
         vsLobbyMsg(''); vsRender();
         return;
       } catch (e) { if (e.type !== 'unavailable-id') throw e; }
@@ -3023,39 +3037,59 @@ async function vsJoin() {
   } catch (e) { vsLobbyMsg('Could not join: ' + (e.message || e.type)); }
 }
 
-function vsSetupConn(c) {
+function vsSetupConn(c, opened) {
   vs.conn = c;
-  c.on('open', () => { vsLobbyMsg(''); vsSend({ t: 'hi', name: vsName(), s: current }); vsRender(); });
+  const hello = () => { vsLobbyMsg(''); vsSend({ t: 'hi', role: 'player', name: vsName(), s: current }); vsRender(); };
+  if (opened) hello(); else c.on('open', hello);
   c.on('data', vsOnData);
   c.on('close', () => {
     vs.conn = null; vs.oppName = ''; vs.oppReady = false;
+    specSend({ t: 'names', host: vsName(), guest: '' });
     if (vs.phase !== 'idle') vsEndRound(true);
     vsNote('Your opponent left.' + (vs.host ? ' Share the code to play again.' : ''));
     if (!vs.host) vsLeave(true); else vsRender();
   });
 }
-const vsSend = m => { if (vs.conn && vs.conn.open) vs.conn.send(m); };
+// PeerJS can't encode `undefined`, so every message goes out as plain JSON-safe data.
+const wire = m => JSON.parse(JSON.stringify(m));
+const vsSend = m => { if (vs.conn && vs.conn.open) vs.conn.send(wire(m)); };
 const vsNote = t => { $('vsNote').textContent = t; };
 
 function vsOnData(m) {
   if (!m || typeof m !== 'object') return;
-  if (m.t === 'hi') { vs.oppName = String(m.name || 'Opponent').slice(0, 16); if (typeof m.s === 'string' && colorCountsOk(m.s)) vs.oppState = m.s; vsRender(); }
+  if (m.t === 'hi') {
+    vs.oppName = String(m.name || 'Opponent').slice(0, 16); if (typeof m.s === 'string' && colorCountsOk(m.s)) vs.oppState = m.s;
+    specSend({ t: 'names', host: vsName(), guest: vs.oppName, gs: vs.oppState }); vsRender();
+  }
   else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) {
     const prev = vs.oppState;
     vs.oppState = m.s;
     const moves = Array.isArray(m.m) && m.m.every(x => typeof x === 'string' && /^[URFDLB]['2]?$/.test(x)) ? m.m : null;
     if (vsOppView) vsOppView.show(m.s, prev, moves);
+    specSend({ t: 'state', who: 'guest', s: m.s, m: moves });
   }
-  else if (m.t === 'round' && typeof m.scramble === 'string') vsStartRound(m.scramble);
-  else if (m.t === 'ready') { vs.oppReady = !!m.v; vsMaybeGo(); vsRender(); }
+  else if (m.t === 'round' && typeof m.scramble === 'string') {
+    vs.bo = m.bo === 5 ? 5 : 1; vs.roundNo = Number(m.n) || vs.roundNo + 1;
+    vsStartRound(m.scramble);
+  }
+  else if (m.t === 'newmatch') vsResetMatch();
+  else if (m.t === 'ready') { vs.oppReady = !!m.v; specSend({ t: 'ready', who: 'guest', v: !!m.v }); vsMaybeGo(); vsRender(); }
   else if (m.t === 'go') vsGo();
-  else if (m.t === 'done') { vs.oppTime = typeof m.time === 'number' ? m.time : null; vsCheckFinish(); vsRender(); }
+  else if (m.t === 'done') {
+    vs.oppTime = typeof m.time === 'number' ? m.time : null;
+    specSend({ t: 'done', who: 'guest', time: vs.oppTime });
+    vsCheckFinish(); vsRender();
+  }
 }
 
 async function vsNewRound() {
   if (!vs.host || !vs.conn || !solver.ready) return;
   const scramble = vs.bot && vs.bot.ghost ? vs.bot.ghost.scramble : (await solver.scramble()).trim();
-  vsSend({ t: 'round', scramble });
+  if (vs.matchOver) vsResetMatch(true);
+  vs.bo = Number($('vsBo').value) === 5 ? 5 : 1;
+  vs.roundNo++;
+  vsSend({ t: 'round', scramble, bo: vs.bo, n: vs.roundNo });
+  specSend({ t: 'round', scramble, bo: vs.bo, n: vs.roundNo, score: vs.score });
   vsStartRound(scramble);
 }
 
@@ -3087,13 +3121,13 @@ async function vsReplan(reason) {
 
 function vsCheckReady() {
   const ready = vs.phase === 'scrambling' && current === vs.target;
-  if (ready !== vs.meReady) { vs.meReady = ready; vsSend({ t: 'ready', v: ready }); }
+  if (ready !== vs.meReady) { vs.meReady = ready; vsSend({ t: 'ready', v: ready }); specSend({ t: 'ready', who: 'host', v: ready }); }
   vsNote(vs.meReady ? (vs.oppReady ? 'Both ready…' : `Ready! Waiting for ${vs.oppName || 'your opponent'}…`) : 'Apply the scramble.');
   vsMaybeGo();
 }
 
 function vsMaybeGo() {
-  if (vs.host && vs.phase === 'scrambling' && vs.meReady && vs.oppReady) { vsSend({ t: 'go' }); vsGo(); }
+  if (vs.host && vs.phase === 'scrambling' && vs.meReady && vs.oppReady) { vsSend({ t: 'go' }); specSend({ t: 'go' }); vsGo(); }
 }
 
 function vsGo() {
@@ -3122,6 +3156,7 @@ function vsFinishMine(time) {
   if (vs.myTime !== undefined) return;
   vs.myTime = time;
   vsSend({ t: 'done', time });
+  specSend({ t: 'done', who: 'host', time });
   vsCheckFinish();
   vsRender();
 }
@@ -3147,13 +3182,130 @@ function vsEndRound(aborted) {
   else if (op == null || (me != null && me < op)) { vs.score[0]++; res = `You win! ${fmt(me)}` + (op != null ? ` vs ${fmt(op)}` : ''); celebrate('You win! 🏆'); }
   else if (me == null || op < me) { vs.score[1]++; res = `${vs.oppName || 'Opponent'} wins: ${fmt(op)}` + (me != null ? ` vs ${fmt(me)}` : ''); }
   else res = `Tie! ${fmt(me)}`;
+  vs.rounds.push({ me, op });
   $('vsTimer').textContent = me != null ? fmt(me) : 'DNF';
-  vsNote(res + (vs.host ? '' : ' — waiting for the host to start the next round.'));
+  if (vs.bo === 5 && Math.max(...vs.score) >= 3) {
+    vs.matchOver = true;
+    const iWon = vs.score[0] > vs.score[1];
+    if (iWon) setTimeout(() => celebrate('You won the match! 🏆'), 600);
+    res = iWon ? `🏆 You win the match ${vs.score[0]}–${vs.score[1]}!` : `${vs.oppName || 'Opponent'} wins the match ${vs.score[1]}–${vs.score[0]}.`;
+  }
+  vsNote(res + (vs.host ? '' : vs.matchOver ? ' — the host can start a new match.' : ' — waiting for the host to start the next round.'));
   vsRender();
 }
 
+function vsResetMatch(send) {
+  Object.assign(vs, { score: [0, 0], rounds: [], roundNo: 0, matchOver: false });
+  if (send) { vsSend({ t: 'newmatch' }); specSend({ t: 'newmatch' }); }
+  vsRender();
+}
+
+/* ------------------------------ Spectators -------------------------------
+ * The host relays both players' cubes and the round events to anyone watching. */
+function specSend(m) { const w = wire(m); for (const c of vs.specs) if (c.open) c.send(w); }
+function specAdd(c, m) {
+  vs.specs.push(c);
+  c.on('close', () => { vs.specs = vs.specs.filter(x => x !== c); vsRender(); });
+  c.send(wire({ t: 'init', host: { name: vsName(), s: current, ready: vs.meReady, time: vs.myTime },
+    guest: { name: vs.oppName, s: vs.oppState, ready: vs.oppReady, time: vs.oppTime },
+    phase: vs.phase, scramble: vs.scramble, score: vs.score, bo: vs.bo, n: vs.roundNo, el: vs.phase === 'running' ? performance.now() - vs.t0 : null }));
+  vsRender();
+}
+async function vsWatch() {
+  const code = $('vsCodeIn').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)) { vsLobbyMsg('Enter the 5-character code of the game you want to watch.'); return; }
+  try {
+    vsLobbyMsg('Connecting to ' + code + '…');
+    await vsLoadPeer();
+    const peer = await openPeer(null);
+    const c = peer.connect(PEER_PREFIX + code, { reliable: true });
+    Object.assign(vs, { peer, conn: c, code, host: false, watch: { host: {}, guest: {}, phase: 'idle', score: [0, 0], bo: 1, n: 0, scramble: '' } });
+    c.on('open', () => { c.send(wire({ t: 'hi', role: 'spectator', name: vsName() })); vsLobbyMsg(''); vsRender(); });
+    c.on('data', specOnData);
+    c.on('close', () => { vsLeave(true); vsLobbyMsg('The game ended.'); });
+    setTimeout(() => { if (vs.peer === peer && !(vs.conn && vs.conn.open)) { vsLeave(true); vsLobbyMsg(`No game found with code ${code}.`); } }, 10000);
+  } catch (e) { vsLobbyMsg('Could not connect: ' + (e.message || e.type)); }
+}
+function specOnData(m) {
+  const w = vs.watch;
+  if (!w || !m || typeof m !== 'object') return;
+  const side = m.who === 'guest' ? w.guest : w.host;
+  if (m.t === 'init') {
+    for (const x of [m.host, m.guest]) if (x && !('time' in x)) x.time = undefined;
+    Object.assign(w, { host: m.host || {}, guest: m.guest || {}, phase: m.phase, scramble: m.scramble || '', score: m.score || [0, 0], bo: m.bo || 1, n: m.n || 0 });
+    if (m.phase === 'running' && m.el != null) { w.t0 = performance.now() - m.el; specClock(); }
+  } else if (m.t === 'names') {
+    w.host.name = m.host; w.guest.name = m.guest; if (m.gs) w.guest.s = m.gs;
+  } else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) {
+    const prev = side.s; side.s = m.s;
+    const moves = Array.isArray(m.m) && m.m.every(x => typeof x === 'string' && /^[URFDLB]['2]?$/.test(x)) ? m.m : null;
+    const view = m.who === 'guest' ? vsOppView : vsMeView;
+    if (view) view.show(m.s, prev, moves);
+    return;
+  } else if (m.t === 'round') {
+    Object.assign(w, { phase: 'scrambling', scramble: m.scramble, bo: m.bo || 1, n: m.n || w.n + 1 });
+    if (m.score) w.score = m.score;
+    for (const x of [w.host, w.guest]) { x.ready = false; x.time = undefined; }
+    $('vsTimer').textContent = '0.00';
+  } else if (m.t === 'newmatch') {
+    w.score = [0, 0];
+  } else if (m.t === 'ready') {
+    side.ready = !!m.v;
+  } else if (m.t === 'go') {
+    w.phase = 'countdown';
+    let n = 3;
+    const tick = () => {
+      if (w.phase !== 'countdown') return;
+      if (n > 0) { $('vsTimer').textContent = String(n--); $('vsTimer').className = 'vs-timer count'; setTimeout(tick, 1000); return; }
+      w.phase = 'running'; w.t0 = performance.now(); $('vsTimer').className = 'vs-timer'; specClock(); specRender();
+    };
+    tick();
+  } else if (m.t === 'done') {
+    side.time = typeof m.time === 'number' ? m.time : null;
+    if (w.host.time !== undefined && w.guest.time !== undefined) {
+      w.phase = 'idle';
+      const a = w.host.time, b = w.guest.time;
+      if (a != null && (b == null || a < b)) w.score[0]++; else if (b != null && (a == null || b < a)) w.score[1]++;
+    }
+  }
+  specRender();
+}
+function specClock() {
+  const w = vs.watch;
+  const loop = () => {
+    if (!w || w.phase !== 'running' || vs.watch !== w) return;
+    $('vsTimer').textContent = fmt(performance.now() - w.t0);
+    requestAnimationFrame(loop);
+  };
+  loop();
+}
+function specRender() {
+  const w = vs.watch;
+  if (!vsMeView) { vsMeView = makeMiniCube($('vsMeCube')); vsOppView = makeMiniCube($('vsOppCube')); }
+  if (w.host.s && vsMeView.target !== w.host.s) vsMeView.paint(w.host.s);
+  if (w.guest.s && vsOppView.target !== w.guest.s) vsOppView.paint(w.guest.s);
+  $('vsCodeLbl').classList.remove('hidden');
+  $('vsCodeShow').textContent = vs.code; $('vsWatchers').textContent = '👀 watching';
+  $('vsMeName').textContent = w.host.name || 'Host';
+  $('vsOppName').textContent = w.guest.name || 'Waiting for a player…';
+  const t = x => x.time === undefined ? (w.phase === 'scrambling' && x.ready ? 'ready ✓' : '') : x.time === null ? 'DNF' : fmt(x.time);
+  $('vsMeTime').textContent = t(w.host); $('vsOppTime').textContent = t(w.guest);
+  $('vsScore').textContent = `${w.score[0]} – ${w.score[1]}` + (w.bo === 5 ? ' · best of 5' : '');
+  $('vsScr').classList.toggle('hidden', !['scrambling', 'countdown', 'running'].includes(w.phase));
+  $('vsGuide').classList.add('hidden');
+  $('vsAlg').textContent = w.scramble;
+  for (const id of ['vsRound', 'vsGiveUp', 'vsBo']) $(id).classList.add('hidden');
+  $('vsMatch').classList.add('hidden');
+  const a = w.host.time, b = w.guest.time;
+  $('vsNote').textContent = w.phase === 'scrambling' ? 'Players are scrambling…' : w.phase === 'countdown' ? 'Get ready…'
+    : w.phase === 'running' ? 'Racing!' : a !== undefined && b !== undefined
+      ? (a != null && (b == null || a < b) ? `${w.host.name} wins the round` : b != null && (a == null || b < a) ? `${w.guest.name} wins the round` : 'Tie') : 'Waiting for the next round…';
+}
+
 function vsOnState(prev, moves) {
+  if (vs.watch) return;                    // spectators' own cubes don't take part
   vsSend({ t: 'state', s: current, m: moves || null });
+  specSend({ t: 'state', who: 'host', s: current, m: moves || null });
   if (vsMeView) vsMeView.show(current, prev, moves);
   if (vs.phase === 'scrambling') {
     if (vs.busy) return;
@@ -3167,6 +3319,8 @@ function vsOnState(prev, moves) {
 function vsLeave(keepMsg) {
   cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
   botStop(); vs.bot = null;
+  for (const c of vs.specs) { try { c.close(); } catch (e) { /* ignore */ } }
+  Object.assign(vs, { specs: [], watch: null, bo: 1, roundNo: 0, rounds: [], matchOver: false });
   try { if (vs.conn) vs.conn.close(); } catch (e) { /* ignore */ }
   try { if (vs.peer) vs.peer.destroy(); } catch (e) { /* ignore */ }
   Object.assign(vs, { peer: null, conn: null, code: '', phase: 'idle', oppName: '', oppState: SOLVED });
@@ -3177,6 +3331,12 @@ function vsLeave(keepMsg) {
 
 function vsRender() {
   const inRoom = !!vs.peer && (vs.host || (vs.conn && vs.conn.open));
+  if (vs.watch && inRoom) {
+    $('vsLobby').classList.add('hidden'); $('vsRoom').classList.remove('hidden');
+    document.body.classList.toggle('vs-room', mode === 'vs');
+    specRender(); return;
+  }
+  if (!vs.watch) for (const id of ['vsRound', 'vsBo']) $(id).classList.remove('hidden');
   document.body.classList.toggle('vs-room', inRoom && mode === 'vs');
   $('vsLobby').classList.toggle('hidden', inRoom);
   $('vsRoom').classList.toggle('hidden', !inRoom);
@@ -3196,7 +3356,16 @@ function vsRender() {
   const done = vs.myTime !== undefined && vs.oppTime !== undefined && vs.phase === 'idle';
   $('vsMeTime').classList.toggle('win', done && vs.myTime != null && (vs.oppTime == null || vs.myTime < vs.oppTime));
   $('vsOppTime').classList.toggle('win', done && vs.oppTime != null && (vs.myTime == null || vs.oppTime < vs.myTime));
-  $('vsScore').textContent = `${vs.score[0]} – ${vs.score[1]}`;
+  $('vsScore').textContent = `${vs.score[0]} – ${vs.score[1]}` + (vs.bo === 5 ? ' · best of 5' : '');
+  $('vsWatchers').textContent = vs.specs.length ? `👀 ${vs.specs.length} watching` : '';
+  $('vsBo').classList.toggle('hidden', !vs.host || vs.phase !== 'idle' || (vs.rounds.length > 0 && !vs.matchOver && vs.bo === 5));
+  const sum = $('vsMatch');
+  sum.classList.toggle('hidden', !(vs.bo === 5 && vs.rounds.length));
+  if (vs.bo === 5 && vs.rounds.length) {
+    sum.innerHTML = `<h4>${vs.matchOver ? (vs.score[0] > vs.score[1] ? '🏆 You won the match' : `${vs.oppName || 'Opponent'} won the match`) : `Best of 5 — round ${vs.rounds.length + (vs.phase === 'idle' ? 0 : 1)}`}</h4>` +
+      `<table><tr><th>Round</th><th>You</th><th>${vs.oppName || 'Opponent'}</th></tr>` +
+      vs.rounds.map((r, i) => `<tr><td>${i + 1}</td><td${r.me != null && (r.op == null || r.me < r.op) ? ' style="color:var(--ok);font-weight:700"' : ''}>${r.me == null ? 'DNF' : fmt(r.me)}</td><td${r.op != null && (r.me == null || r.op < r.me) ? ' style="color:var(--ok);font-weight:700"' : ''}>${r.op == null ? 'DNF' : fmt(r.op)}</td></tr>`).join('') + '</table>';
+  }
   const inRound = ['scrambling', 'countdown', 'running'].includes(vs.phase);
   $('vsScr').classList.toggle('hidden', !inRound);
   $('vsGuide').classList.toggle('hidden', vs.phase !== 'scrambling');
@@ -3208,7 +3377,7 @@ function vsRender() {
   }
   $('vsRound').classList.toggle('hidden', !vs.host || vs.phase !== 'idle');
   $('vsRound').disabled = !(vs.conn && vs.conn.open) || !solver.ready;
-  $('vsRound').textContent = vs.score[0] + vs.score[1] ? 'Next round' : 'Start round';
+  $('vsRound').textContent = vs.matchOver ? 'New match' : vs.score[0] + vs.score[1] ? 'Next round' : 'Start round';
   $('vsGiveUp').classList.toggle('hidden', vs.phase !== 'running' || vs.myTime !== undefined);
   if (vs.phase === 'idle' && vs.host && !(vs.conn && vs.conn.open)) vsNote(`Share the code ${vs.code} — waiting for someone to join…`);
   else if (vs.phase === 'idle' && vs.myTime === undefined) vsNote(vs.host ? 'Press “Start round” when you\'re both ready.' : 'Waiting for the host to start a round…');
@@ -3963,6 +4132,8 @@ $('vsGhost').onclick = vsStartGhost;
 $('vsBotLevel').onfocus = () => { $('vsBotLevel').querySelector('[value=me]').textContent = `Bot · Matches you (~${Math.round(myLevelSec())} s)`; };
 try { const lv = localStorage.getItem('micube.botLevel'); if (lv && BOT_LEVELS[lv]) $('vsBotLevel').value = lv; } catch (e) { /* ignore */ }
 $('vsJoin').onclick = vsJoin;
+$('vsWatch').onclick = vsWatch;
+$('vsBo').onchange = () => { if (vs.rounds.length) vsResetMatch(true); vs.bo = Number($('vsBo').value) === 5 ? 5 : 1; vsRender(); };
 $('vsCodeIn').onkeydown = e => { if (e.key === 'Enter') vsJoin(); };
 $('vsCodeIn').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
 $('vsLeave').onclick = () => vsLeave();

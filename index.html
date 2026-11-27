@@ -284,6 +284,13 @@
   .lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .lg-line { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
   .timer.insp { color: var(--warn); }
+  .diag:has(svg) { display: block; }
+  .diag svg { width: 100%; height: 100%; display: block; }
+  .mistake { border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); background: color-mix(in srgb, var(--bad) 7%, transparent);
+    border-radius: 14px; padding: 10px 12px; margin-bottom: 12px; }
+  .mis-cubes { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
+  .mis-cubes > div { text-align: center; }
+  .mis-cap { font-size: 14px; } .mis-cap b { font-family: var(--mono); color: var(--accent); }
   /* settings dialog */
   dialog.sheet { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--bg); color: var(--text);
     width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: var(--shadow); }
@@ -468,7 +475,27 @@
     <!-- Guided solve -->
     <div id="tab-guide">
       <div class="seg" id="methodSeg" style="margin-bottom:12px">
-        <button data-method="beginner">Beginner (white flower)</button><button data-method="fast">Fastest</button>
+        <button data-method="beginner">Beginner (white flower)</button><button data-method="fast">Fastest</button><button data-method="patterns">Patterns</button>
+      </div>
+      <div id="patPanel" class="hidden">
+        <div class="msg" style="margin-top:0">Pick a pattern. Hold <strong>white on top, green in front</strong>. Starting from a solved cube you'll learn the real pattern algorithm.</div>
+        <div class="cases" id="patGrid" style="margin-top:10px"></div>
+        <div class="b-step hidden" id="patStep" style="margin-top:12px">
+          <div class="b-title" id="patTitle"></div>
+          <div class="tr-alg" id="patAlg" style="cursor:default"></div>
+          <div class="msg" id="patText"></div>
+        </div>
+      </div>
+      <div class="mistake hidden" id="mistake">
+        <div class="row" style="justify-content:space-between">
+          <strong>Oops — that wasn't the move</strong>
+          <div class="row"><button id="misReplay">Replay</button><button id="misClose" class="icon-btn" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+        </div>
+        <div class="mis-cubes">
+          <div><div class="mini-scene" id="misYou"></div><div class="mis-cap">You did <b id="misDid"></b></div></div>
+          <div><div class="mini-scene" id="misWant"></div><div class="mis-cap">Guide wanted <b id="misExp"></b></div></div>
+        </div>
+        <div class="msg" id="misText" style="margin-top:4px"></div>
       </div>
       <div id="bPanel" class="hidden">
         <ol class="stages" id="bStages"></ol>
@@ -670,11 +697,39 @@
     <!-- Algorithms: trainer + memorisation tracking -->
     <div id="tab-train" class="hidden">
       <div class="row" style="justify-content:space-between">
-        <div class="seg" id="setSeg"><button data-set="beg">Beginner</button><button data-set="oll" class="active">OLL</button><button data-set="pll">PLL</button></div>
+        <div class="seg" id="setSeg"><button data-set="beg">Beginner</button><button data-set="cross">Cross</button><button data-set="f2l">F2L</button><button data-set="oll" class="active">OLL</button><button data-set="pll">PLL</button></div>
         <div class="legend" id="legend"></div>
       </div>
 
-      <div class="trainer">
+      <!-- Cross trainer -->
+      <div id="crossPanel" class="trainer hidden">
+        <div class="row" style="justify-content:space-between">
+          <h3 style="margin:0">Cross trainer</h3>
+          <button class="primary" id="xNew">New cross scramble</button>
+        </div>
+        <div class="msg">Plan the white cross, then do it. The app compares your moves with the shortest possible cross.</div>
+        <div class="opts">
+          <label class="chk"><input type="checkbox" id="xInsp" checked> 15 s to plan (inspection)</label>
+          <span>Hold any way you like — the white cross is detected from the cube itself.</span>
+        </div>
+        <div class="scr-alg" id="xAlg" style="margin-top:8px">–</div>
+        <div id="xSetup">
+          <div class="next" style="margin-bottom:8px"><div class="mv" id="xNext" style="font-size:40px">&ndash;</div><div class="sub" id="xSub"></div></div>
+          <div class="moves" id="xMoves"></div>
+          <div class="bar"><div id="xProg"></div></div>
+          <div class="msg" id="xProgText"></div>
+        </div>
+        <div class="timer" id="xTimer">0.00</div>
+        <div class="timer-note" id="xNote"></div>
+        <div class="recon hidden" id="xResult"></div>
+        <div class="tiles" style="margin-top:12px">
+          <div class="tile"><div class="k">Crosses</div><div class="v" id="xCount">0</div></div>
+          <div class="tile"><div class="k">Avg. moves (optimal)</div><div class="v" id="xAvgMoves">–</div></div>
+          <div class="tile"><div class="k">Avg. time</div><div class="v" id="xAvgTime">–</div></div>
+        </div>
+      </div>
+
+      <div class="trainer" id="caseTrainer">
         <div class="row" style="justify-content:space-between">
           <h3 style="margin:0">Trainer</h3>
           <div class="row">
@@ -709,7 +764,7 @@
         </div>
       </div>
 
-      <h3>Cases</h3>
+      <h3 id="casesTitle">Cases</h3>
       <div id="caseDetail" class="case-detail hidden"></div>
       <div class="cases" id="caseGrid"></div>
       <div class="msg">
@@ -1002,7 +1057,10 @@ const BEGINNER_DATA = [
   { id: 'b-twist-front', name: 'Twist corner', nick: 'yellow facing front', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D R' D' R D R' D' R D"],
     white: { id: 'b-twist-front-w', algs: ["L D L' D' L D L' D' L D L' D' L D L' D'"] } },
 ];
-const CASES = { beg: [], oll: [], pll: [] };
+// F2L, front-right slot (41 cases): SpeedCubeDB algorithms via @moishy/algsets (MIT), each verified to
+// solve its case while keeping the cross and the other three slots.
+const F2L_DATA = [{"id":"f2l-1","name":"F2L 1","subset":"Free Pairs","algs":["U R U' R'","R' F R F'","y' r' U' R U M'"]},{"id":"f2l-2","name":"F2L 2","subset":"Free Pairs","algs":["F R' F' R","y' U' R' U R","U' F' U F"]},{"id":"f2l-3","name":"F2L 3","subset":"Free Pairs","algs":["F' U' F","y' R' U' R","y L' U' L"]},{"id":"f2l-4","name":"F2L 4","subset":"Free Pairs","algs":["R U R'","y' f R f'","y F U F'"]},{"id":"f2l-5","name":"F2L 5","subset":"Disconnected Pairs","algs":["U' R U R' U2 R U' R'","F2 L' U' L U F2","U' R U R' U' R U2 R'"]},{"id":"f2l-6","name":"F2L 6","subset":"Disconnected Pairs","algs":["U' r U' R' U R U r'","y' U R' U' R U2 R' U R","U F' U' F U2 F' U F"]},{"id":"f2l-7","name":"F2L 7","subset":"Disconnected Pairs","algs":["U' R U2 R' U' R U2 R'","M' U' M U2 r U' r'","U' R U2 R' U2 R U' R'"]},{"id":"f2l-8","name":"F2L 8","subset":"Disconnected Pairs","algs":["r' U2 R2 U R2 U r","y' U R' U2 R U2 R' U R","y U L' U2 L U2 L' U L"]},{"id":"f2l-9","name":"F2L 9","subset":"Disconnected Pairs","algs":["U' R U' R' U F' U' F","F R U R' U' F' R U' R'","U' R U' R' d R' U' R"]},{"id":"f2l-10","name":"F2L 10","subset":"Disconnected Pairs","algs":["U' R U R' U R U R'","U2 R U' R' U' R U R'","d R' U R d' R U R'"]},{"id":"f2l-11","name":"F2L 11","subset":"Connected Pairs","algs":["U' R U2 R' U F' U' F","y' R U2 R2 U' R2 U' R'","F' U L' U2 L U2 F"]},{"id":"f2l-12","name":"F2L 12","subset":"Connected Pairs","algs":["R U' R' U R U' R' U2 R U' R'","R' U2 R2 U R2 U R","U F' U2 F U' R U R'"]},{"id":"f2l-13","name":"F2L 13","subset":"Connected Pairs","algs":["M' U' R U R' U2 R U' r'","y' U R' U R U' R' U' R","R U' R' U R' F R F' R U' R'"]},{"id":"f2l-14","name":"F2L 14","subset":"Connected Pairs","algs":["U' R U' R' U R U R'","R U2 R' U2 R U R' U2 R U' R'","U' R2 D R' U R D' R2"]},{"id":"f2l-15","name":"F2L 15","subset":"Connected Pairs","algs":["M U r U' r' U' M'","R' D' R U' R' D R U R U' R'","R U R' U2 R U' R' U R U' R'"]},{"id":"f2l-16","name":"F2L 16","subset":"Connected Pairs","algs":["R U' R' U2 F' U' F","R U' R' U2 y' R' U' R","U M' U R U' r' U' R U R'"]},{"id":"f2l-17","name":"F2L 17","subset":"Connected Pairs","algs":["R U2 R' U' R U R'","y2 L U2 L' U' L U L'","R U R' U' R U2 R' U2 R U R'"]},{"id":"f2l-18","name":"F2L 18","subset":"Connected Pairs","algs":["F' U2 F U F' U' F","y' R' U2 R U R' U' R","y L' U2 L U L' U' L"]},{"id":"f2l-19","name":"F2L 19","subset":"Disconnected Pairs","algs":["U R U2 R' U R U' R'","U R U2 R2 F R F'","R U' R' U R U' R' U R U R'"]},{"id":"f2l-20","name":"F2L 20","subset":"Disconnected Pairs","algs":["U' R U' R2 F R F' R U' R'","y' U' R' U2 R U' R' U R","y U' L' U2 L U' L' U L"]},{"id":"f2l-21","name":"F2L 21","subset":"Disconnected Pairs","algs":["U2 R U R' U R U' R'","R U' R' U2 R U R'","R B U2 B' R'"]},{"id":"f2l-22","name":"F2L 22","subset":"Disconnected Pairs","algs":["r U' r' U2 r U r'","F' L' U2 L F","y' U2 R' U' R U' R' U R"]},{"id":"f2l-23","name":"F2L 23","subset":"Connected Pairs","algs":["U R U' R' U' R U' R' U R U' R'","R U R' U2 R U R' U' R U R'","U2 R2 U2 R' U' R U' R2"]},{"id":"f2l-24","name":"F2L 24","subset":"Connected Pairs","algs":["F U R U' R' F' R U' R'","U' R U R2 F R F' R U' R'","y' R' U' R U2 R' U' R U R' U' R"]},{"id":"f2l-25","name":"F2L 25","subset":"Corner In Slot","algs":["U' R' F R F' R U R'","R' F' R U R U' R' F","U' F' R U R' U' R' F R"]},{"id":"f2l-26","name":"F2L 26","subset":"Corner In Slot","algs":["U R U' R' F R' F' R","R S' R' U R S R'","U R U R' U' y L' U' L"]},{"id":"f2l-27","name":"F2L 27","subset":"Corner In Slot","algs":["R U' R' U R U' R'","F' U' F U2 R U' R'","y' f R' f' U f R' f'"]},{"id":"f2l-28","name":"F2L 28","subset":"Corner In Slot","algs":["R U R' U' F R' F' R","y L' U L U' L' U L","F' U F U' F' U F"]},{"id":"f2l-29","name":"F2L 29","subset":"Corner In Slot","algs":["R' F R F' U R U' R'","y L' U' L U L' U' L","y' R' U' R U R' U' R"]},{"id":"f2l-30","name":"F2L 30","subset":"Corner In Slot","algs":["R U R' U' R U R'","U' R U2 R' U2 R U R'","U' F R' F' R2 U R'"]},{"id":"f2l-31","name":"F2L 31","subset":"Edge In Slot","algs":["U' R' F R F' R U' R'","R U' R' U y' R' U R","F' U F R U2 R'"]},{"id":"f2l-32","name":"F2L 32","subset":"Edge In Slot","algs":["U R U' R' U R U' R' U R U' R'","R U R' U' R U R' U' R U R'","R2 U R2 U R2 U2 R2"]},{"id":"f2l-33","name":"F2L 33","subset":"Edge In Slot","algs":["U' R U' R' U2 R U' R'","y R' D R U' R' D' R","R U R' U' R U' R' U R U' R'"]},{"id":"f2l-34","name":"F2L 34","subset":"Edge In Slot","algs":["U R U R' U2 R U R'","U' R U2 R' U R U R'","U R' D' R U' R' D R"]},{"id":"f2l-35","name":"F2L 35","subset":"Edge In Slot","algs":["U' R U R' U F' U' F","U2 R U R' F R' F' R","U' R U R' U y' R' U' R"]},{"id":"f2l-36","name":"F2L 36","subset":"Edge In Slot","algs":["U F' U' F U' R U R'","U2 R' F R F' U2 R U R'","R2 u R U R' U' u' R' U R'"]},{"id":"f2l-37","name":"F2L 37","subset":"Pieces In Slot","algs":["R2 U2 F R2 F' U2 R' U R'","R' F R F' R U' R' U R U' R' U2 R U' R'","R U2 R' U R U2 R' U F' U' F"]},{"id":"f2l-38","name":"F2L 38","subset":"Pieces In Slot","algs":["R U' R' U' R U R' U2 R U' R'","R U R' U' R U2 R' U' R U R'","R2 U2 R' U' R U' R' U2 R'"]},{"id":"f2l-39","name":"F2L 39","subset":"Pieces In Slot","algs":["R U' R' U R U2 R' U R U' R'","R U2 R U R' U R U2 R2","R U R' U2 R U' R' U R U R'"]},{"id":"f2l-40","name":"F2L 40","subset":"Pieces In Slot","algs":["r U' r' U2 r U r' R U R'","F' L' U2 L F R U R'","R U' R' F R U R' U' F' R U' R'"]},{"id":"f2l-41","name":"F2L 41","subset":"Pieces In Slot","algs":["R U' R' r U' r' U2 r U r'","R U' R' F' L' U2 L F","R U R' U' y M U' R' F R U M'"]}];
+const CASES = { beg: [], oll: [], pll: [], f2l: [] };
 const CASE_BY_ID = new Map();
 const SIG_INDEX = { oll: new Map(), pll: new Map() };
 let SOLVED_SIG = {};
@@ -1017,6 +1075,11 @@ function buildCases() {
     }
   }
   SOLVED_SIG = { oll: ollSig(SOLVED), pll: pllSig(SOLVED) };
+  for (const d of F2L_DATA) {
+    const algs = d.algs.map(normAlg);
+    const c = { ...d, set: 'f2l', algs, state: stateAfter(invertAlg(algs[0])), nick: '', turns: Math.min(...algs.map(algTurns)) };
+    CASES.f2l.push(c); CASE_BY_ID.set(c.id, c);
+  }
   buildBeginnerCases();
 }
 /** Beginner cases depend on the grip (white on top uses R' D' R D style algorithms). */
@@ -1500,6 +1563,20 @@ function renderGuide() {
   // Plans are worked out yellow-up; the cube's own frame is white-up, so a white-up grip needs no renaming.
   const grip = beginner && bPlan ? gripOf(bPlan.stage) : 'yellow';
   guide.view = beginner && grip === 'yellow' ? flipMove : (m => m);
+  const patterns = guideMethod === 'patterns';
+  $('patPanel').classList.toggle('hidden', !patterns);
+  $('btnSolve').classList.toggle('hidden', patterns);
+  $('autoSolve').parentElement.classList.toggle('hidden', patterns);
+  if (patterns) {
+    document.querySelectorAll('#methodSeg button').forEach(b => b.classList.toggle('active', b.dataset.method === guideMethod));
+    $('bPanel').classList.add('hidden');
+    if (!$('patGrid').children.length) renderPatterns();
+    if (patBusy) guide.renderMessage('…', 'Calculating…');
+    else if (patSel && current === patSel.target) guide.renderMessage('<span class="solved-banner">Done! 🎨</span>', patSel.name);
+    else if (!guide.active) guide.renderMessage('–', 'Pick a pattern above.');
+    else guide.renderSteps();
+    return;
+  }
   document.querySelectorAll('#methodSeg button').forEach(b => b.classList.toggle('active', b.dataset.method === guideMethod));
   $('bPanel').classList.toggle('hidden', !beginner);
   $('btnSolve').textContent = beginner ? 'Show next step' : 'Solve current state';
@@ -1554,7 +1631,25 @@ async function solveNow(reason) {
   }
 }
 
-function guideOnState(move) {
+function guideOnState(move, prev) {
+  // Mistake replay: the user was following the guide and turned something else.
+  const snap = guide.active && guide.moves[guide.idx] && !bWaiting
+    ? { exp: guide.moves[guide.idx], expState: guide.states[guide.idx + 1], idx: guide.idx } : null;
+  if (snap && prev) {
+    const before = { idx: guide.idx, half: guide.half };
+    const ok = guide.track(current);
+    if (ok && guide.idx > before.idx) hideMistake();
+    if (!ok && current !== SOLVED && snap.idx > 0) showMistake(snap, prev, current);   // only while following the moves
+  }
+  if (guideMethod === 'patterns') {
+    if (!patSel || patBusy) { renderGuide(); return; }
+    const onTrack = guide.active && guide.track(current);
+    if (current === patSel.target) {
+      celebrate(`${patSel.name}! 🎨`); guide.active = false; renderGuide(); return;
+    }
+    if (!onTrack) { startPattern(PATTERNS.find(x => x.id === patSel.id)); return; }
+    renderGuide(); return;
+  }
   if (guideMethod === 'beginner') {
     if (current === SOLVED) { if (bPlan) celebrate('Solved! 🎉'); bPlan = null; guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
     if (!bPlan) { beginnerStep(); return; }          // start guiding as soon as the cube moves
@@ -1579,6 +1674,61 @@ function guideOnState(move) {
     else { guide.clear(); renderGuide(); $('solveMsg').textContent = 'Off the planned path — press “Solve” for a new solution.'; }
   }
 }
+
+/* ------------------------------ Patterns --------------------------------- */
+const PATTERNS = [
+  { id: 'checker', name: 'Checkerboard', alg: 'R2 L2 U2 D2 F2 B2' },
+  { id: 'spots', name: 'Six spots', alg: "U D' R L' F B' U D'" },
+  { id: 'plusminus', name: 'Plus-minus', alg: 'U2 R2 L2 U2 R2 L2' },
+  { id: 'tetris', name: 'Tetris', alg: "L R F B U' D' L' R'" },
+  { id: 'wire', name: 'Wire', alg: 'R L F B R L F B R L F B R2 B2 L2 R2 B2 L2' },
+  { id: 'cubecube', name: 'Cube in a cube', alg: "F L F U' R U F2 L2 U' L' B D' B' L2 U" },
+  { id: 'superflip', name: 'Superflip', alg: "U R2 F B R B2 R U2 L B2 R U' D' R2 F R' L B2 U2 F2" },
+];
+let patSel = null, patBusy = false;
+function renderPatterns() {
+  $('patGrid').innerHTML = PATTERNS.map(pt => {
+    const st = applyFixed(SOLVED, splitAlg(pt.alg));
+    return `<button class="case-card${patSel && patSel.id === pt.id ? ' sel' : ''}" data-pat="${pt.id}"><div class="diag">${isoSVG(st, i => `var(--c${st[i]})`)}</div><div class="nm">${pt.name}</div><div class="sm">${splitAlg(pt.alg).length} moves</div></button>`;
+  }).join('');
+  $('patStep').classList.toggle('hidden', !patSel);
+  if (patSel) {
+    $('patTitle').textContent = patSel.name;
+    $('patAlg').textContent = patSel.alg;
+    $('patText').textContent = patSel.fromSolved ? 'Follow the moves from your solved cube — that\'s the real pattern algorithm.'
+      : 'Your cube isn\'t solved, so these moves take it straight to the pattern. Solve it first to learn the pattern\'s own algorithm.';
+  }
+}
+async function startPattern(pt) {
+  patSel = { ...pt, target: applyFixed(SOLVED, splitAlg(pt.alg)), fromSolved: current === SOLVED };
+  patBusy = true; renderPatterns(); guide.clear(); renderGuide();
+  const from = current;
+  const moves = from === SOLVED ? splitAlg(pt.alg) : await pathTo(from, pt.alg);
+  patBusy = false;
+  guide.set(moves, from);
+  if (current !== from && !guide.track(current)) return startPattern(pt);
+  renderPatterns(); renderGuide();
+}
+
+/* ------------------------- Mistake replay -------------------------------- */
+let misYouView = null, misWantView = null, misLast = null;
+function showMistake(snap, prev, now) {
+  const did = findMoves(prev, now);
+  if (!did) return;
+  if (!misYouView) { misYouView = makeMiniCube($('misYou')); misWantView = makeMiniCube($('misWant')); }
+  misLast = { prev, now, did, want: snap.expState, wantMoves: findMoves(prev, snap.expState) || [], exp: snap.exp };
+  $('misDid').textContent = did.map(m => guide.view(m)).join(' ');
+  $('misExp').textContent = guide.view(snap.exp);
+  $('misText').textContent = `${guide.view(snap.exp)}: ${describeMove(guide.view(snap.exp), snap.exp[0]).replace(/<[^>]+>/g, '')}`;
+  $('mistake').classList.remove('hidden');
+  replayMistake();
+}
+function replayMistake() {
+  const m = misLast; if (!m) return;
+  misYouView.paint(m.prev); misWantView.paint(m.prev);
+  setTimeout(() => { misYouView.show(m.now, m.prev, m.did, true); misWantView.show(m.want, m.prev, m.wantMoves, true); }, 250);
+}
+const hideMistake = () => $('mistake').classList.add('hidden');
 
 /* ------------------------- Beginner method -------------------------------
  * Layer by layer, starting with the white flower (daisy). Everything is computed in the user's grip:
@@ -2133,6 +2283,149 @@ function renderTimer(note) {
   $('timerNote').textContent = note || (timer.phase === 'scrambling' ? 'Apply the scramble.' : timer.phase === 'running' ? 'Solving… the timer stops when the cube is solved.' : '');
 }
 
+/* --------------------------- Cross trainer ------------------------------
+ * Shortest white cross: the 4 white edges (position + flip, 24 values each) give 331,776 states;
+ * a breadth-first search from the solved cross gives the exact distance of every one of them.
+ * ------------------------------------------------------------------------- */
+let crossTable = null, edgeMoveTable = null, crossPieces = null;
+function buildCrossTable() {
+  if (crossTable) return;
+  const where = new Map();                       // facelet -> slot*2 + side
+  E_FACELET.forEach((pr, e) => pr.forEach((f, o) => where.set(f, e * 2 + o)));
+  edgeMoveTable = {};
+  for (const m of ALL_MOVES) {
+    const p = PERM[m], dest = new Array(54);
+    for (let j = 0; j < 54; j++) dest[p[j]] = j;
+    edgeMoveTable[m] = E_FACELET.flatMap(pr => pr.map(f => where.get(dest[f])));
+  }
+  // the white cross pieces in the cube's own frame (white = U): their solved slot and side
+  crossPieces = E_FACELET.map((pr, e) => pr.map(f => SOLVED[f])).map((cols, e) => ({ e, cols }))
+    .filter(x => x.cols.includes('U')).map(x => x.e * 2 + x.cols.indexOf('U'));
+  crossTable = new Int8Array(24 ** 4).fill(-1);
+  const enc = a => ((a[0] * 24 + a[1]) * 24 + a[2]) * 24 + a[3];
+  let frontier = [crossPieces.slice()];
+  crossTable[enc(crossPieces)] = 0;
+  for (let d = 1; frontier.length; d++) {
+    const next = [];
+    for (const st of frontier) for (const m of ALL_MOVES) {
+      const t = edgeMoveTable[m], n = [t[st[0]], t[st[1]], t[st[2]], t[st[3]]], k = enc(n);
+      if (crossTable[k] === -1) { crossTable[k] = d; next.push(n); }
+    }
+    frontier = next;
+  }
+}
+/** Where the 4 white edges are in a facelet state (slot*2 + which side shows white). */
+function crossOf(s) {
+  const out = [];
+  for (const target of crossPieces) {
+    const want = E_FACELET[target >> 1].map(f => SOLVED[f]).sort().join('');
+    E_FACELET.forEach((pr, e) => { const cols = pr.map(f => s[f]); if (cols.slice().sort().join('') === want) out.push(e * 2 + cols.indexOf('U')); });
+  }
+  return out;
+}
+/** The shortest cross solution (cube frame) for a facelet state. */
+function optimalCross(s) {
+  buildCrossTable();
+  let st = crossOf(s);
+  const enc = a => ((a[0] * 24 + a[1]) * 24 + a[2]) * 24 + a[3];
+  const moves = [];
+  for (let d = crossTable[enc(st)]; d > 0; d--) {
+    for (const m of ALL_MOVES) {
+      const t = edgeMoveTable[m], n = st.map(v => t[v]);
+      if (crossTable[enc(n)] === d - 1) { moves.push(m); st = n; break; }
+    }
+  }
+  return moves;
+}
+
+const xtrk = new Tracker('x');
+const xc = { phase: 'off', scramble: '', target: null, busy: false, t0: 0, inspT0: 0, raf: 0, turns: 0, optimal: [] };
+const xStats = { n: 0, moves: 0, optimal: 0, time: 0 };
+try { Object.assign(xStats, JSON.parse(localStorage.getItem('micube.cross.v1') || '{}')); } catch (e) { /* ignore */ }
+const xView = m => trainOpts.top === 'yellow' ? flipMove(m) : m;
+xtrk.view = xView;
+
+async function crossNew() {
+  if (!solver.ready) return;
+  cancelAnimationFrame(xc.raf);
+  Object.assign(xc, { phase: 'setup', scramble: (await solver.scramble()).trim(), turns: 0, inspT0: 0 });
+  xc.target = applyMoves(SOLVED, xc.scramble);
+  $('xResult').classList.add('hidden');
+  $('xTimer').textContent = '0.00'; $('xTimer').className = 'timer';
+  await crossReplan();
+}
+async function crossReplan() {
+  if (xc.busy) return;
+  xc.busy = true; crossRender('Calculating scramble moves…');
+  const from = current, scr = xc.scramble;
+  let moves;
+  try { moves = await pathTo(from, scr); } catch (e) { xc.busy = false; crossRender('Error: ' + e.message); return; }
+  xc.busy = false;
+  if (xc.phase !== 'setup' || scr !== xc.scramble) return;
+  xtrk.set(moves, from);
+  if (current === xc.target) crossReady();
+  else if (current !== from && !xtrk.track(current)) { crossReplan(); return; }
+  crossRender();
+}
+function crossReady() {
+  xc.phase = 'ready';
+  xc.optimal = optimalCross(current);
+  if ($('xInsp').checked) {
+    xc.inspT0 = performance.now();
+    const loop = () => {
+      if (xc.phase !== 'ready') return;
+      const el = (performance.now() - xc.inspT0) / 1000;
+      $('xTimer').textContent = el < 15 ? String(Math.ceil(15 - el)) : '+' + Math.floor(el - 15);
+      $('xTimer').className = 'timer insp';
+      xc.raf = requestAnimationFrame(loop);
+    };
+    loop();
+  }
+  crossRender();
+}
+function crossOnState() {
+  const now = performance.now();
+  if (xc.phase === 'setup') {
+    if (xc.busy) return;
+    if (current === xc.target) crossReady();
+    else if (!xtrk.track(current)) { crossReplan(); return; }
+    crossRender(); return;
+  }
+  if (xc.phase === 'ready') {
+    cancelAnimationFrame(xc.raf);
+    xc.phase = 'running'; xc.t0 = now; xc.turns = 0;
+    $('xTimer').className = 'timer running';
+    const loop = () => { if (xc.phase !== 'running') return; $('xTimer').textContent = fmt(performance.now() - xc.t0); xc.raf = requestAnimationFrame(loop); };
+    loop();
+  }
+  if (xc.phase === 'running') {
+    xc.turns++;
+    if (crossDone(current, 'U')) {
+      cancelAnimationFrame(xc.raf);
+      const t = Math.round(now - xc.t0), opt = xc.optimal.length;
+      xc.phase = 'done';
+      $('xTimer').textContent = fmt(t); $('xTimer').className = 'timer';
+      Object.assign(xStats, { n: xStats.n + 1, moves: xStats.moves + xc.turns, optimal: xStats.optimal + opt, time: xStats.time + t });
+      try { localStorage.setItem('micube.cross.v1', JSON.stringify(xStats)); } catch (e) { /* ignore */ }
+      const best = xc.turns <= opt;
+      if (best) sfx.good(); else sfx.ding();
+      $('xResult').classList.remove('hidden');
+      $('xResult').innerHTML = `<b>Your cross:</b> ${xc.turns} turns in ${fmt(t)}${best ? ' — optimal! 🎯' : ''}\n<b>Shortest possible:</b> ${opt} moves: ${xc.optimal.map(xView).join(' ') || '(already solved)'}`;
+      crossRender(best ? 'Perfect — the shortest possible cross!' : `${xc.turns - opt} turn${xc.turns - opt === 1 ? '' : 's'} more than the shortest cross. Press “New cross scramble” for another.`);
+    }
+  }
+}
+function crossRender(note) {
+  $('xAlg').textContent = xc.scramble || '–';
+  $('xSetup').classList.toggle('hidden', xc.phase !== 'setup');
+  if (xc.phase === 'setup') { if (xc.busy || !xtrk.active) xtrk.renderMessage('…', 'Calculating…'); else xtrk.renderSteps(); }
+  const def = { off: 'Press “New cross scramble” to start.', setup: 'Apply the scramble.', ready: `Plan your cross${$('xInsp').checked ? ' (15 s)' : ''} — the timer starts on your first turn.`, running: 'Go!', done: '' };
+  $('xNote').textContent = note || def[xc.phase] || '';
+  $('xCount').textContent = xStats.n;
+  $('xAvgMoves').textContent = xStats.n ? `${(xStats.moves / xStats.n).toFixed(1)} (${(xStats.optimal / xStats.n).toFixed(1)})` : '–';
+  $('xAvgTime').textContent = xStats.n ? fmt(xStats.time / xStats.n) : '–';
+}
+
 /* ------------------------------ Trainer ---------------------------------- */
 const trk = new Tracker('t');
 // Holding yellow on top (cube flipped with z2) swaps right/left and top/bottom; front/back stay.
@@ -2154,7 +2447,36 @@ const llConj = () => trainOpts.top === 'white' ? '' : 'z2';
 const userCross = () => trainOpts.top === 'white' ? 'D' : 'U';
 const COLOR_FLIP = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' };
 
+/** A small 3D-style picture of the top, front and right faces. `col(i)` gives facelet i's colour. */
+function isoSVG(state, col) {
+  const k = 0.866, P = ([x, y, z]) => [((x - z) * k * 10 + 30).toFixed(2), ((x + z) * 5 - y * 10 + 30).toFixed(2)];
+  const face = (f, i) => {
+    const [x, y, z] = faceletPos(f, i), h = 0.45, q = 1.5;
+    const pts = f === 'U' ? [[x - h, q, z - h], [x + h, q, z - h], [x + h, q, z + h], [x - h, q, z + h]]
+      : f === 'F' ? [[x - h, y + h, q], [x + h, y + h, q], [x + h, y - h, q], [x - h, y - h, q]]
+      : [[q, y + h, z + h], [q, y + h, z - h], [q, y - h, z - h], [q, y - h, z + h]];
+    return `<polygon points="${pts.map(P).map(p => p.join(',')).join(' ')}" fill="${col(FACES.indexOf(f) * 9 + i)}"/>`;
+  };
+  const back = f => {
+    const q = 1.5, b = 1.55;
+    const pts = f === 'U' ? [[-b, q, -b], [b, q, -b], [b, q, b], [-b, q, b]] : f === 'F' ? [[-b, b, q], [b, b, q], [b, -b, q], [-b, -b, q]] : [[q, b, b], [q, b, -b], [q, -b, -b], [q, -b, b]];
+    return `<polygon points="${pts.map(P).map(p => p.join(',')).join(' ')}" fill="var(--plastic)" stroke="var(--plastic)" stroke-width="1.2" stroke-linejoin="round"/>`;
+  };
+  let g = '';
+  for (const f of ['U', 'F', 'R']) { g += back(f); for (let i = 0; i < 9; i++) g += face(f, i); }
+  return `<svg viewBox="2 0 56 62" aria-hidden="true">${g}</svg>`;
+}
+
 function diagramHTML(c) {
+  if (c.set === 'f2l') {
+    // colour only the pair (white-red-green corner and red-green edge, in the case's frame) and the solved layers
+    const flip = ch => llConj() ? COLOR_FLIP[ch] : ch;
+    const pair = new Set();
+    for (const pc of CORNERS) if (pc.map(x => c.state[x.i]).sort().join('') === 'DFR') pc.forEach(x => pair.add(x.i));
+    for (const pc of EDGES) if (pc.map(x => c.state[x.i]).sort().join('') === 'FR') pc.forEach(x => pair.add(x.i));
+    const topLayer = i => i < 9 || (i % 9 < 3 && [9, 18, 36, 45].some(o => i >= o && i < o + 9));
+    return isoSVG(c.state, i => topLayer(i) && !pair.has(i) ? '#4a5060' : `var(--c${flip(c.state[i])})`);
+  }
   const layout = [null, 47, 46, 45, null, 36, 0, 1, 2, 11, 37, 3, 4, 5, 10, 38, 6, 7, 8, 9, null, 18, 19, 20, null];
   const map = ch => c.set === 'beg' || llConj() ? COLOR_FLIP[ch] : ch;
   return layout.map(i => {
@@ -2218,6 +2540,7 @@ async function trainReplan(reason) {
 function trainDone(s) {
   const X = trCross(), Y = OPP[X];
   if (!(crossDone(s, X) && slotCount(s, X) === 4)) return false;
+  if (train.set === 'f2l') return true;
   if (train.set === 'oll') return faceDone(s, Y);
   return s === SOLVED || [Y, Y + '2', Y + "'"].some(a => applyMoves(s, a) === SOLVED);
 }
@@ -2353,6 +2676,10 @@ function renderCaseDetail() {
 
 function renderTrainTab() {
   document.querySelectorAll('#setSeg button').forEach(b => b.classList.toggle('active', b.dataset.set === train.set));
+  const cross = train.set === 'cross';
+  for (const id of ['caseTrainer', 'casesTitle', 'caseGrid', 'legend']) $(id).classList.toggle('hidden', cross);
+  $('crossPanel').classList.toggle('hidden', !cross);
+  if (cross) { $('caseDetail').classList.add('hidden'); crossRender(); return; }
   $('trPick').value = trainOpts.pick; $('trTop').value = train.set === 'beg' ? begGrip : trainOpts.top; $('trHide').checked = trainOpts.hide;
   renderLegend(); renderCaseGrid(); renderCaseDetail(); renderTrainer();
 }
@@ -3146,10 +3473,11 @@ function onStateChange(state, move) {
   if (!replay.active) render(current, prev, moves);
   sfx.click();
   if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
+  else if (mode === 'train' && train.set === 'cross') crossOnState();
   else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
   else if (mode === 'vs') vsOnState(prev, moves);
   else if (mode === 'turns') tuOnState();
-  else guideOnState(move || (moves && moves[0]));
+  else guideOnState(move || (moves && moves[0]), prev);
 }
 
 function onSolverReady() {
@@ -3564,7 +3892,7 @@ $('bGrip').onchange = e => {
 document.querySelectorAll('#methodSeg button').forEach(b => b.onclick = () => {
   guideMethod = b.dataset.method;
   try { localStorage.setItem('micube.method', guideMethod); } catch (e) { /* ignore */ }
-  guide.clear(); bPlan = null; bHold = 0; bWaiting = false; $('solveMsg').textContent = '';
+  guide.clear(); bPlan = null; bHold = 0; bWaiting = false; patSel = null; hideMistake(); $('solveMsg').textContent = '';
   if (guideMethod === 'beginner' && current !== SOLVED) beginnerStep(); else renderGuide();
 });
 $('btnMarkSolved').onclick = async () => {
@@ -3797,6 +4125,11 @@ $('btnSettings').addEventListener('click', () => {
   const cases = Object.values(prog).filter(x => x.ev && x.ev.length).length;
   $('dataHome').textContent = `${solves.length} timed solves, ${cases} algorithm cases practised, ${tuStats.correct} turn-practice answers — saved in this browser.`;
 });
+
+$('patGrid').onclick = e => { const b = e.target.closest('[data-pat]'); if (b) startPattern(PATTERNS.find(x => x.id === b.dataset.pat)); };
+$('misReplay').onclick = replayMistake;
+$('misClose').onclick = hideMistake;
+$('xNew').onclick = crossNew;
 
 $('netToggle').onclick = () => {
   const v = document.querySelector('.views');

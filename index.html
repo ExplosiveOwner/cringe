@@ -3,10 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d16">
 <title>Smart Cube Solver</title>
 <!-- Kociemba two-phase solver (cubejs). cube.js is used on the main thread for state simulation;
      cube.js + solve.js are also loaded inside a Web Worker so solver init doesn't freeze the UI. -->
 <script src="https://cdn.jsdelivr.net/npm/cubejs@1.3.2/lib/cube.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #0f1115; --panel: #181b22; --panel2: #20242d; --line: #2c313c;
@@ -198,6 +202,87 @@
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
 
+  /* ================= Design system ================= */
+  :root {
+    --bg: #0a0d16; --panel: rgba(21, 26, 40, .78); --panel2: rgba(255, 255, 255, .045); --line: rgba(255, 255, 255, .08);
+    --text: #e9edf6; --muted: #8b94aa; --accent: #6d8bff; --accent2: #a46bff; --ok: #34d399; --warn: #fbbf24; --bad: #f87171;
+    --glow1: rgba(109, 139, 255, .18); --glow2: rgba(164, 107, 255, .14); --shadow: 0 10px 30px rgba(0, 0, 0, .35);
+    --plastic: #111; --sticker-gap: 2px; --sticker-r: 5px;
+    --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  :root[data-theme="graphite"] {
+    --bg: #0f1115; --panel: rgba(24, 27, 34, .92); --panel2: #20242d; --line: #2c313c; --text: #e7e9ee; --muted: #8b93a3;
+    --accent: #4f8cff; --accent2: #4f8cff; --glow1: transparent; --glow2: transparent;
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f8; --panel: rgba(255, 255, 255, .86); --panel2: rgba(15, 23, 42, .045); --line: rgba(15, 23, 42, .1);
+    --text: #172033; --muted: #5d6880; --accent: #4f63ff; --accent2: #8b5cf6; --glow1: rgba(79, 99, 255, .14);
+    --glow2: rgba(139, 92, 246, .12); --shadow: 0 10px 30px rgba(30, 41, 80, .12);
+  }
+  :root[data-cube="stickerless"] { --plastic: #1b1b1f; --sticker-gap: .5px; --sticker-r: 2px; }
+  :root[data-cube="white"] { --plastic: #e9e9ec; }
+  html, body { font-family: var(--font); }
+  body { min-height: 100vh;
+    background: radial-gradient(900px 600px at 10% -10%, var(--glow1), transparent 60%),
+      radial-gradient(800px 500px at 110% 10%, var(--glow2), transparent 60%), var(--bg); background-attachment: fixed; }
+  header { background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 30; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { width: 30px; height: 30px; filter: drop-shadow(0 4px 10px rgba(0, 0, 0, .35)); }
+  h1 { font-weight: 800; letter-spacing: -.01em; font-size: 19px; }
+  h1 span { background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .status { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  section h2, h3 { font-weight: 700; letter-spacing: .08em; }
+  button, select { border-radius: 10px; transition: transform .08s, border-color .15s, background .15s, box-shadow .15s; }
+  button:active:not(:disabled) { transform: scale(.97); }
+  button.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent;
+    box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 35%, transparent); }
+  button.primary:hover:not(:disabled) { box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 50%, transparent); border-color: transparent; }
+  button.icon-btn { display: inline-grid; place-items: center; width: 38px; height: 36px; padding: 0; }
+  button.icon-btn svg, .tabs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .tabs { gap: 6px; border-bottom: none; background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 4px; margin: 0 0 14px; }
+  .tabs button { display: inline-flex; align-items: center; gap: 7px; border: none; border-radius: 10px; padding: 8px 14px; }
+  .tabs button.active { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; border: none;
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .tile, .scr-alg, .recon, .trainer, .case-detail, .b-step, .turn-card, .log { border: 1px solid var(--line); }
+  .tile { border-radius: 12px; }
+  .tile .v { font-family: var(--mono); }
+  .timer, .vs-timer, .turn-sym, .next .mv, .big-code, .scr-alg, .recon, .tr-alg, .alg-opt, .sym-grid button, .pl-time {
+    font-family: var(--mono); }
+  .timer.running { color: var(--text); text-shadow: 0 0 30px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .next .mv, .turn-sym { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .moves span { border-radius: 8px; font-family: var(--mono); }
+  .moves span.cur { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 20%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
+  .bar { height: 8px; border-radius: 99px; }
+  .bar > div { background: linear-gradient(90deg, var(--ok), #5eead4); border-radius: 99px; }
+  .stages li.cur { background: linear-gradient(135deg, var(--accent), var(--accent2)); border-color: transparent; }
+  .case-card { transition: transform .12s, border-color .15s; }
+  .case-card:hover { transform: translateY(-2px); }
+  .pl { background: var(--plastic); }
+  .pl > div { inset: var(--sticker-gap); border-radius: var(--sticker-r); }
+  .cap { background: var(--plastic); }
+  .scene { filter: drop-shadow(0 18px 24px rgba(0, 0, 0, .35)); }
+  :root[data-theme="light"] .scene { filter: drop-shadow(0 18px 22px rgba(30, 41, 80, .25)); }
+  /* settings dialog */
+  dialog.sheet { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--bg); color: var(--text);
+    width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: var(--shadow); }
+  dialog.sheet::backdrop { background: rgba(5, 8, 16, .55); backdrop-filter: blur(4px); }
+  .sheet-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; border-bottom: 1px solid var(--line); }
+  .sheet-head h2 { margin: 0; font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--text); }
+  .sheet-body { padding: 6px 16px 16px; overflow: auto; }
+  .sheet-body h3 { margin-top: 16px; }
+  .choice { display: flex; flex-wrap: wrap; gap: 8px; }
+  .choice button.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+  /* toast + confetti */
+  .toast { position: fixed; left: 50%; top: 76px; transform: translate(-50%, -20px); opacity: 0; z-index: 60; pointer-events: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2)); color: #fff; font-weight: 700; padding: 10px 18px;
+    border-radius: 999px; box-shadow: var(--shadow); transition: opacity .25s, transform .25s; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  #confetti { position: fixed; inset: 0; pointer-events: none; z-index: 55; }
+
   /* ---------- PC: wide screens ---------- */
   @media (min-width: 1100px) {
     main { grid-template-columns: minmax(420px, 500px) minmax(0, 1fr); max-width: 1480px; gap: 20px; padding: 20px; }
@@ -215,6 +300,11 @@
     header { padding: 8px 12px; gap: 6px; }
     h1 { font-size: 15px; }
     header .row { gap: 6px; }
+    header { position: relative; }
+    #btnSettings { position: absolute; top: 8px; right: 12px; width: 34px; height: 32px; }
+    #btnDisconnect:disabled { display: none; }
+    .brand svg { width: 24px; height: 24px; }
+    .status { padding: 3px 10px; }
     header button { padding: 5px 9px; font-size: 13px; }
     .status { font-size: 12px; flex-basis: 100%; order: 3; }
     main { padding: 8px; gap: 10px; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
@@ -231,8 +321,10 @@
     /* app-style bottom tab bar */
     .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0; background: var(--panel);
       border-top: 1px solid var(--line); border-bottom: none; padding: 0 4px env(safe-area-inset-bottom); }
-    .tabs button { flex: 1; padding: 12px 2px 10px; font-size: 13px; border-bottom: none; border-top: 2px solid transparent; }
-    .tabs button.active { border-top-color: var(--accent); }
+    .tabs { border-radius: 0; padding: 4px 4px calc(4px + env(safe-area-inset-bottom)); background: color-mix(in srgb, var(--bg) 88%, transparent);
+      backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: none; border-top: 1px solid var(--line); gap: 2px; }
+    .tabs button { flex: 1; flex-direction: column; gap: 3px; padding: 7px 2px 6px; font-size: 11px; border-radius: 10px; }
+    .tabs button.active { box-shadow: none; }
     .timer { font-size: 52px; }
     .next .mv { font-size: 44px; }
     .tiles .v { font-size: 17px; }
@@ -241,14 +333,45 @@
 </head>
 <body>
 <header>
-  <h1>Smart Cube</h1>
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true">
+      <path d="M16 2 29 9.5 16 17 3 9.5Z" fill="var(--cU)" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M3 9.5 16 17v14L3 23.5Z" fill="var(--cF)" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>
+      <path d="M29 9.5 16 17v14l13-7.5Z" fill="var(--cR)" stroke="#111" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>
+    <h1>Smart <span>Cube</span></h1>
+  </div>
   <div class="row">
     <div class="status"><span class="dot" id="dot"></span><span id="statusText">Not connected</span><span id="lastTurn"></span></div>
     <button class="primary" id="btnConnect">Connect cube</button>
     <button id="btnConnectAll" title="Use this if your cube doesn't appear in the normal list">Show all devices</button>
     <button id="btnDisconnect" disabled>Disconnect</button>
+    <button class="icon-btn" id="btnSettings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+    </button>
   </div>
 </header>
+<div class="toast" id="toast"></div>
+<canvas id="confetti"></canvas>
+<dialog class="sheet" id="settingsDlg">
+  <div class="sheet-head"><h2>Settings</h2><button class="icon-btn" id="settingsClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <h3>Theme</h3>
+    <div class="choice" id="themeChoice"><button data-v="midnight">Midnight</button><button data-v="graphite">Graphite</button><button data-v="light">Light</button></div>
+    <h3>Cube style</h3>
+    <div class="choice" id="cubeChoice"><button data-v="black">Black plastic</button><button data-v="stickerless">Stickerless</button><button data-v="white">White plastic</button></div>
+    <h3>Colours</h3>
+    <div id="colorsHome"></div>
+    <h3>Sound</h3>
+    <div class="opts" style="margin-top:0">
+      <label class="chk"><input type="checkbox" id="sfxClicks"> Turn clicks</label>
+      <label class="chk"><input type="checkbox" id="sfxEffects" checked> Dings, fanfares &amp; feedback</label>
+      <label class="chk"><input type="checkbox" id="fxConfetti" checked> Confetti for personal bests</label>
+    </div>
+    <h3>Your data</h3>
+    <div id="dataHome" class="msg" style="margin-top:0">Solves and progress are saved in this browser.</div>
+  </div>
+</dialog>
 
 <main>
   <section id="liveSection">
@@ -290,14 +413,16 @@
       </div>
       <div class="msg">Keyboard: U R F D L B (hold Shift for prime). These apply to the on-screen state; a connected cube overrides it on its next packet.</div>
     </details>
-    <details style="margin-top:8px">
+    <details style="margin-top:8px" id="colorsDetails">
       <summary>Colours</summary>
+      <div id="colorsBox">
       <div class="colors" id="colors"></div>
       <div class="row" style="margin-top:8px">
         <button id="btnColorXiaomi">Xiaomi cube</button>
         <button id="btnColorClassic">Classic (bright)</button>
       </div>
       <div class="msg">Pick a preset, or tap a swatch to fine-tune a face to your cube's sticker colour. Saved on this device.</div>
+      </div>
     </details>
     <details style="margin-top:8px">
       <summary>Bluetooth log</summary>
@@ -308,11 +433,11 @@
 
   <section>
     <div class="tabs">
-      <button data-tab="guide" class="active">Guide</button>
-      <button data-tab="turns">Turns</button>
-      <button data-tab="timer">Timer</button>
-      <button data-tab="train">Algorithms</button>
-      <button data-tab="vs">1v1</button>
+      <button data-tab="guide" class="active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Guide</button>
+      <button data-tab="turns"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Turns</button>
+      <button data-tab="timer"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>Timer</button>
+      <button data-tab="train"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Algorithms</button>
+      <button data-tab="vs"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3.5"/><path d="M2 20a6 6 0 0 1 12 0"/><circle cx="17" cy="9" r="2.5"/><path d="M15.5 14.5a5 5 0 0 1 6.5 5.5"/></svg>1v1</button>
     </div>
     <div id="solverStatus" class="msg" style="margin-top:0">Loading solver&hellip;</div>
 
@@ -1382,7 +1507,7 @@ async function solveNow(reason) {
 
 function guideOnState(move) {
   if (guideMethod === 'beginner') {
-    if (current === SOLVED) { guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
+    if (current === SOLVED) { if (bPlan) celebrate('Solved! 🎉'); bPlan = null; guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
     if (!bPlan) { beginnerStep(); return; }          // start guiding as soon as the cube moves
     const onTrack = guide.active && guide.track(current);
     if (onTrack && guide.idx === guide.moves.length) { beginnerStep(); return; }   // step finished
@@ -1398,7 +1523,7 @@ function guideOnState(move) {
     return;
   }
   const onTrack = guide.track(current);
-  if (current === SOLVED) guide.active = false;
+  if (current === SOLVED && guide.active) { guide.active = false; sfx.ding(); }
   renderGuide();
   if (current !== SOLVED && !onTrack && !guideBusy) {
     if ($('autoSolve').checked) solveNow(`Off track${move ? ' (' + move + ')' : ''}.`);
@@ -1711,7 +1836,9 @@ let bPlan = null;
 
 function beginnerStep() {
   bHold = 0; bWaiting = false;
+  const before = bPlan ? bPlan.stage : 0;
   bPlan = beginnerPlan(current, begGrip);
+  if (before && bPlan.stage > before && bPlan.stage < 9) { sfx.ding(); toast(`Step ${before} done ✓`, 1600); }
   if (bPlan.stage === 9) guide.clear(); else guide.set(bPlan.moves.map(flipMove), current);
   renderGuide();
 }
@@ -1726,6 +1853,7 @@ function beginnerReplan() {
   if (bPlan && np.stage < bPlan.stage && np.stage !== 9 && bHold < B_HOLD_TURNS) {
     bHold++; bWaiting = true; guide.clear(); renderGuide(); return;
   }
+  if (bPlan && np.stage > bPlan.stage && np.stage < 9) { sfx.ding(); toast(`Step ${bPlan.stage} done ✓`, 1600); }
   bHold = 0; bWaiting = false; bPlan = np;
   if (np.stage === 9) guide.clear(); else guide.set(np.moves.map(flipMove), current);
   renderGuide();
@@ -1837,7 +1965,13 @@ function finishSolve(total) {
     solve.ll[set] = { id, ok };
     addCaseEvent(id, { d: Date.now(), src: 'solve', ok: ok ? 1 : 0, t: p.exec, n: p.turns });
   }
+  const prevBest = solves.length ? Math.min(...solves.map(x => x.time)) : null;
+  const prevBestAo5 = bestAo5();
   solves.push(solve);
+  const newAo5 = aoN(solves, 5);
+  if (prevBest !== null && total < prevBest) setTimeout(() => celebrate(`New personal best! ${fmt(total)} 🏆`), 300);
+  else if (prevBestAo5 !== null && newAo5 !== null && newAo5 < prevBestAo5) setTimeout(() => celebrate(`New best average of 5: ${fmt(newAo5)} 🏆`), 300);
+  else sfx.ding();
   saveSolves();
   selectedId = solve.id;
   timer.phase = 'idle';
@@ -1994,6 +2128,7 @@ function finishTrain(t) {
   const gaps = train.rec.slice(1).map((r, i) => r.t - train.rec[i].t);
   const ok = judgeLook(c, train.rec.length, gaps);
   addCaseEvent(c.id, { d: Date.now(), src: 'train', ok: ok ? 1 : 0, t, n: train.rec.length });
+  if (ok) sfx.good(); else sfx.bad();
   train.phase = 'done';
   $('trTimer').textContent = fmt(t);
   renderTrainer(`${fmt(t)} · ${train.rec.length} turns · ${ok ? 'one-look ✓' : 'not one-look (pause or extra turns)'} — next case…`);
@@ -2196,6 +2331,8 @@ function tuJudge() {
     }
     tuSave();
     $('tuFb').textContent = tu.wrong ? "✓ That's it." : `✓ Correct — ${(t / 1000).toFixed(2)} s`;
+    sfx.good();
+    if (!tu.wrong && tuStats.streak === tuStats.best && [10, 25, 50, 100].includes(tuStats.streak)) celebrate(`${tuStats.streak} in a row! 🔥`);
     $('tuFb').className = 'turn-fb ok';
     tuRender();
     tu.timer = setTimeout(() => { if (tu.on) tuNext(); }, 700);
@@ -2216,6 +2353,7 @@ function tuWrong() {
   }
   tu.wrong = true;
   $('tuFb').textContent = `✗ You did ${did}. Try ${tu.sym} again.`;
+  sfx.bad();
   $('tuFb').className = 'turn-fb bad';
   // try again from where the cube is now
   tu.start = current; tu.target = tuAfter(current, tu.sym); tu.pending = tuPartials(current, tu.target);
@@ -2528,7 +2666,7 @@ function vsEndRound(aborted) {
   const me = vs.myTime, op = vs.oppTime;
   let res;
   if (me == null && op == null) res = 'Nobody finished.';
-  else if (op == null || (me != null && me < op)) { vs.score[0]++; res = `You win! ${fmt(me)}` + (op != null ? ` vs ${fmt(op)}` : ''); }
+  else if (op == null || (me != null && me < op)) { vs.score[0]++; res = `You win! ${fmt(me)}` + (op != null ? ` vs ${fmt(op)}` : ''); celebrate('You win! 🏆'); }
   else if (me == null || op < me) { vs.score[1]++; res = `${vs.oppName || 'Opponent'} wins: ${fmt(op)}` + (me != null ? ` vs ${fmt(me)}` : ''); }
   else res = `Tie! ${fmt(me)}`;
   $('vsTimer').textContent = me != null ? fmt(me) : 'DNF';
@@ -2611,6 +2749,11 @@ function saveSolves() {
   catch (e) { $('historyMsg').textContent = 'Could not save history on this device (storage unavailable). Solves are kept until you close the page.'; }
 }
 
+function bestAo5() {
+  let best = null;
+  for (let i = 5; i <= solves.length; i++) { const a = aoN(solves.slice(0, i), 5); if (best === null || a < best) best = a; }
+  return best;
+}
 /** Average of n, WCA style: drop best and worst, mean of the rest. */
 function aoN(list, n) {
   if (list.length < n) return null;
@@ -2757,6 +2900,7 @@ function onStateChange(state, move) {
   current = state;
   const moves = move && applyMoves(prev, move) === state ? [move] : findMoves(prev, state);
   if (!replay.active) render(current, prev, moves);
+  sfx.click();
   if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
   else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
   else if (mode === 'vs') vsOnState(prev, moves);
@@ -3285,6 +3429,95 @@ $('tuReset').onclick = () => {
   Object.assign(tuStats, { correct: 0, wrong: 0, streak: 0, best: 0, times: [], per: {} });
   tuSave(); tuRender();
 };
+/* ---------------------------- Look & feel ------------------------------- */
+const prefs = { theme: 'midnight', cube: 'black', clicks: false, effects: true, confetti: true };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('micube.prefs.v1') || '{}')); } catch (e) { /* ignore */ }
+const savePrefs = () => { try { localStorage.setItem('micube.prefs.v1', JSON.stringify(prefs)); } catch (e) { /* ignore */ } };
+function applyPrefs() {
+  document.documentElement.dataset.theme = prefs.theme;
+  document.documentElement.dataset.cube = prefs.cube;
+  document.querySelectorAll('#themeChoice button').forEach(b => b.classList.toggle('on', b.dataset.v === prefs.theme));
+  document.querySelectorAll('#cubeChoice button').forEach(b => b.classList.toggle('on', b.dataset.v === prefs.cube));
+  $('sfxClicks').checked = prefs.clicks; $('sfxEffects').checked = prefs.effects; $('fxConfetti').checked = prefs.confetti;
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.content = prefs.theme === 'light' ? '#eef1f8' : '#0a0d16';
+}
+document.querySelectorAll('#themeChoice button').forEach(b => b.onclick = () => { prefs.theme = b.dataset.v; savePrefs(); applyPrefs(); });
+document.querySelectorAll('#cubeChoice button').forEach(b => b.onclick = () => { prefs.cube = b.dataset.v; savePrefs(); applyPrefs(); });
+$('sfxClicks').onchange = e => { prefs.clicks = e.target.checked; savePrefs(); if (prefs.clicks) sfx.click(); };
+$('sfxEffects').onchange = e => { prefs.effects = e.target.checked; savePrefs(); if (prefs.effects) sfx.ding(); };
+$('fxConfetti').onchange = e => { prefs.confetti = e.target.checked; savePrefs(); if (prefs.confetti) confetti(); };
+$('btnSettings').onclick = () => $('settingsDlg').showModal();
+$('settingsClose').onclick = () => $('settingsDlg').close();
+$('settingsDlg').addEventListener('click', e => { if (e.target === $('settingsDlg')) $('settingsDlg').close(); });
+$('colorsHome').appendChild($('colorsBox'));      // the colour editor lives in Settings
+$('colorsDetails').remove();
+applyPrefs();
+
+/** Small synthesized sounds (no audio files). */
+const sfx = {
+  ctx: null,
+  ac() {
+    if (!this.ctx) { const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return null; this.ctx = new AC(); }
+    if (this.ctx.state === 'suspended') this.ctx.resume();
+    return this.ctx;
+  },
+  click() {
+    if (!prefs.clicks) return;
+    const ac = this.ac(); if (!ac) return;
+    const n = Math.floor(ac.sampleRate * 0.025), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4);
+    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = 2200 + Math.random() * 600; f.Q.value = 1.4; g.gain.value = 0.5;
+    src.connect(f).connect(g).connect(ac.destination); src.start();
+  },
+  tone(freqs, { dur = 0.22, type = 'sine', vol = 0.12, gap = 0.08 } = {}) {
+    if (!prefs.effects) return;
+    const ac = this.ac(); if (!ac) return;
+    freqs.forEach((fq, i) => {
+      const t = ac.currentTime + i * gap, o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.value = fq;
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(ac.destination); o.start(t); o.stop(t + dur + 0.02);
+    });
+  },
+  ding() { this.tone([988, 1319], { dur: 0.35, gap: 0.07 }); },
+  good() { this.tone([784, 1175], { dur: 0.18, gap: 0.06, vol: 0.1 }); },
+  bad() { this.tone([233, 196], { dur: 0.22, type: 'triangle', gap: 0.1, vol: 0.12 }); },
+  fanfare() { this.tone([523, 659, 784, 1047, 1319], { dur: 0.4, type: 'triangle', gap: 0.1, vol: 0.12 }); },
+};
+
+function toast(text, ms = 2600) {
+  const el = $('toast');
+  el.textContent = text; el.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), ms);
+}
+
+/** Confetti in the cube's colours. */
+function confetti() {
+  if (!prefs.confetti) return;
+  const cv = $('confetti'), ctx = cv.getContext('2d'), dpr = window.devicePixelRatio || 1;
+  cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.scale(dpr, dpr);
+  const cols = FACES.split('').map(f => getComputedStyle(document.documentElement).getPropertyValue('--c' + f).trim());
+  const parts = Array.from({ length: 160 }, () => ({
+    x: innerWidth / 2 + (Math.random() - .5) * innerWidth * .3, y: innerHeight * .3,
+    vx: (Math.random() - .5) * 14, vy: -Math.random() * 13 - 4, s: 6 + Math.random() * 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3,
+    c: cols[Math.floor(Math.random() * cols.length)] }));
+  const t0 = performance.now();
+  const frame = now => {
+    const t = now - t0;
+    ctx.clearRect(0, 0, innerWidth, innerHeight);
+    for (const q of parts) {
+      q.vy += 0.35; q.vx *= 0.99; q.x += q.vx; q.y += q.vy; q.r += q.vr;
+      ctx.save(); ctx.translate(q.x, q.y); ctx.rotate(q.r); ctx.globalAlpha = Math.max(0, 1 - t / 2800);
+      ctx.fillStyle = q.c; ctx.fillRect(-q.s / 2, -q.s / 2, q.s, q.s * .7); ctx.restore();
+    }
+    if (t < 2800) requestAnimationFrame(frame); else ctx.clearRect(0, 0, innerWidth, innerHeight);
+  };
+  requestAnimationFrame(frame);
+}
+function celebrate(text) { sfx.fanfare(); confetti(); toast(text); }
+
 $('netToggle').onclick = () => {
   const v = document.querySelector('.views');
   v.classList.toggle('show-net');

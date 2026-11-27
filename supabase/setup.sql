@@ -167,3 +167,21 @@ create policy "add own badges" on public.user_badges for insert with check (auth
 revoke update, delete on public.user_badges from anon, authenticated;
 grant select on public.user_badges to anon, authenticated;
 grant insert on public.user_badges to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Feature requests from the "Request a feature" button. Anyone can send one;
+-- nobody can read them through the app — read them in Table Editor.
+-- ---------------------------------------------------------------------------
+create table if not exists public.feature_requests (
+  id         bigint generated always as identity primary key,
+  message    text not null check (char_length(message) between 5 and 2000),
+  contact    text check (contact is null or char_length(contact) <= 120),
+  page       text check (page is null or char_length(page) <= 20),
+  user_id    uuid default auth.uid(),
+  created_at timestamptz not null default now()
+);
+alter table public.feature_requests enable row level security;
+drop policy if exists "anyone can send a request" on public.feature_requests;
+create policy "anyone can send a request" on public.feature_requests for insert with check (true);
+revoke all on public.feature_requests from anon, authenticated;
+grant insert (message, contact, page) on public.feature_requests to anon, authenticated;

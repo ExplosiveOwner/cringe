@@ -223,6 +223,11 @@
     --text: #172033; --muted: #5d6880; --accent: #4f63ff; --accent2: #8b5cf6; --glow1: rgba(79, 99, 255, .14);
     --glow2: rgba(139, 92, 246, .12); --shadow: 0 10px 30px rgba(30, 41, 80, .12);
   }
+  :root { color-scheme: dark; }                       /* native dropdown lists, scrollbars and pickers follow the theme */
+  :root[data-theme="light"] { color-scheme: light; }
+  select { background-color: color-mix(in srgb, var(--bg) 82%, var(--text) 18%); color: var(--text); }
+  select option { background-color: var(--bg); color: var(--text); }
+  select option:checked { background-color: var(--accent); color: #fff; }
   :root[data-cube="stickerless"] { --plastic: #1b1b1f; --sticker-gap: .5px; --sticker-r: 2px; }
   :root[data-cube="white"] { --plastic: #e9e9ec; }
   html, body { font-family: var(--font); }
@@ -287,6 +292,18 @@
   .lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   .lg-line { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
   .timer.insp { color: var(--warn); }
+  :root { --s4: #d28e05; } :root[data-theme="light"] { --s4: #f2a600; }
+  .ana { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 6px; }
+  @media (max-width: 760px) { .ana { grid-template-columns: minmax(0, 1fr); } }
+  .ana-time { font: 800 48px/1 var(--mono); background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .ana-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; margin: 10px 0; font-size: 14px; color: var(--muted); }
+  .ana-stats b { color: var(--text); font-family: var(--mono); }
+  .ana-table td, .ana-table th { padding: 6px 8px; }
+  .ana-table tr.grp td { font-weight: 700; border-top: 1px solid var(--line); }
+  .ana-table tr.sub td { color: var(--muted); font-size: 13px; }
+  .ana-table tr.sub td:first-child { padding-left: 26px; }
+  .ana-table .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 0; }
   .diag:has(svg) { display: block; }
   .diag svg { width: 100%; height: 100%; display: block; }
   .mistake { border: 1px solid color-mix(in srgb, var(--bad) 45%, var(--line)); background: color-mix(in srgb, var(--bad) 7%, transparent);
@@ -294,6 +311,13 @@
   .mis-cubes { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap; }
   .mis-cubes > div { text-align: center; }
   .mis-cap { font-size: 14px; } .mis-cap b { font-family: var(--mono); color: var(--accent); }
+  .site-foot a { color: var(--accent); }
+  .credits { padding-left: 18px; line-height: 1.6; }
+  .site-foot { max-width: 1480px; margin: 0 auto; padding: 8px 20px 28px; display: flex; flex-wrap: wrap; gap: 10px;
+    align-items: center; justify-content: space-between; color: var(--muted); font-size: 14px; }
+  #featureText, #featureContact { width: 100%; font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
+    border-radius: 10px; padding: 10px; margin-top: 8px; resize: vertical; }
+  @media (max-width: 700px) { .site-foot { padding-bottom: calc(86px + env(safe-area-inset-bottom)); justify-content: center; } }
   /* settings dialog */
   dialog.sheet { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--bg); color: var(--text);
     width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: var(--shadow); }
@@ -335,7 +359,10 @@
     .status { padding: 3px 10px; }
     header button { padding: 5px 9px; font-size: 13px; }
     .status { font-size: 12px; flex-basis: 100%; order: 3; }
-    main { padding: 8px; gap: 10px; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+    main { padding: 8px; gap: 10px; }
+    section { backdrop-filter: none; -webkit-backdrop-filter: none; background: color-mix(in srgb, var(--bg) 70%, #1b2133); }
+    :root[data-theme="light"] section { background: #fff; }
+    html { scroll-padding-bottom: calc(84px + env(safe-area-inset-bottom)); }   /* nothing scrolls in behind the tab bar */
     section { padding: 10px; border-radius: 10px; }
     #liveSection h2 { display: none; }
     .scene { --s: .82; }
@@ -553,6 +580,23 @@
       </div>
       <div class="timer" id="timer">0.00</div>
       <div class="timer-note" id="timerNote"></div>
+      <div id="detail" class="hidden">
+        <h3 id="detailTitle">Solve</h3>
+        <div class="ana">
+          <div class="ana-left">
+            <div class="ana-time" id="anaTime"></div>
+            <div class="ana-stats" id="anaStats"></div>
+            <div class="chart ana-donut" id="anaDonut"></div>
+          </div>
+          <div class="ana-right"><div class="tbl-wrap"><table id="splits" class="ana-table"></table></div>
+            <div class="msg">Fluency: how smoothly you turned within each step — 100 means no hesitation between moves; pauses longer than 0.4 s lower it.</div></div>
+        </div>
+        <div class="recon" id="recon"></div>
+        <div class="row" style="margin-top:10px">
+          <button id="btnReplay">Replay on cube</button>
+          <button id="btnCopy">Copy reconstruction</button>
+          <button id="btnDelete" class="danger">Delete</button>
+        </div>
 
       <h3>Statistics</h3>
       <div class="tiles">
@@ -581,15 +625,6 @@
       </div>
       <div class="chart" id="splitChart"></div>
 
-      <div id="detail" class="hidden">
-        <h3 id="detailTitle">Solve</h3>
-        <div class="tbl-wrap"><table id="splits"></table></div>
-        <div class="recon" id="recon"></div>
-        <div class="row" style="margin-top:10px">
-          <button id="btnReplay">Replay on cube</button>
-          <button id="btnCopy">Copy reconstruction</button>
-          <button id="btnDelete" class="danger">Delete</button>
-        </div>
       </div>
 
       <h3>History</h3>
@@ -784,6 +819,49 @@
     </div>
   </section>
 </main>
+<footer class="site-foot">
+  <span>Smart Cube · made with 🧊 · <a href="#" id="btnCredits">Credits</a></span>
+  <div class="row">
+    <button id="btnSupport">❤️ Support the project</button>
+    <button id="btnFeature">💡 Request a feature</button>
+  </div>
+</footer>
+<dialog class="sheet" id="featureDlg">
+  <div class="sheet-head"><h2>Request a feature</h2><button class="icon-btn" id="featureClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <p class="msg" style="margin-top:8px">What would make the app better for you? Ideas, wishes and bugs are all welcome.</p>
+    <textarea id="featureText" rows="6" maxlength="2000" placeholder="I would love it if…"></textarea>
+    <input id="featureContact" maxlength="120" placeholder="Your name or e-mail (optional, only if you'd like an answer)">
+    <div class="row" style="margin-top:10px;justify-content:space-between">
+      <span class="msg" id="featureMsg" style="margin:0"></span>
+      <button class="primary" id="featureSend">Send</button>
+    </div>
+  </div>
+</dialog>
+<dialog class="sheet" id="creditsDlg">
+  <div class="sheet-head"><h2>Credits</h2><button class="icon-btn" id="creditsClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <p class="msg" style="margin-top:10px">Smart Cube stands on the shoulders of these free, open-source projects — thank you!</p>
+    <ul class="credits">
+      <li><b>cubejs</b> (MIT) — Kociemba two-phase solver and cube model</li>
+      <li><b>SpeedCubeDB</b> algorithms via <b>@moishy/algsets</b> (MIT) — OLL, PLL and F2L cases</li>
+      <li><b>csTimer</b> (GPL) — the published QiYi smart-cube protocol this app's QiYi support follows</li>
+      <li><b>aes-js</b> (MIT) — encryption for QiYi cubes</li>
+      <li><b>PeerJS</b> (MIT) — direct phone-to-phone connections for 1v1</li>
+      <li><b>Supabase</b> — accounts, rankings and feature requests</li>
+      <li><b>Inter</b> and <b>JetBrains Mono</b> (SIL Open Font License) — fonts</li>
+    </ul>
+    <p class="msg">Not affiliated with Xiaomi, Giiker or QiYi. Their names are used only to say which cubes work with the app.</p>
+  </div>
+</dialog>
+<dialog class="sheet" id="supportDlg">
+  <div class="sheet-head"><h2>Support the project</h2><button class="icon-btn" id="supportClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <p style="margin-top:10px">Thanks for wanting to support Smart Cube! ❤️</p>
+    <p class="msg" id="supportText">A way to support the project is coming soon. Until then, the best support is sharing the app with other cubers.</p>
+    <div class="row"><button id="supportShare">🔗 Share the app</button></div>
+  </div>
+</dialog>
 
 <script>
 'use strict';
@@ -2186,10 +2264,11 @@ function timerOnState(prev, moves) {
   }
   if (timer.phase === 'ready') {
     timer.phase = 'running';
-    timer.penalty = null;
+    timer.penalty = null; timer.inspUsed = null;
     if (timer.inspT0) {       // official rules: start after 15 s = +2, after 17 s = DNF
       const insp = now - timer.inspT0;
       timer.penalty = insp > 17000 ? 'dnf' : insp > 15000 ? 'plus2' : null;
+      timer.inspUsed = Math.round(insp);
       timer.inspT0 = 0;
     }
     timer.t0 = now;
@@ -2242,6 +2321,7 @@ function finishSolve(total) {
   }
   if (timer.penalty === 'dnf') solve.dnf = true; else if (timer.penalty === 'plus2') solve.plus2 = true;
   if (timer.daily) solve.daily = timer.daily;
+  if (timer.inspUsed != null) solve.insp = timer.inspUsed;
   const firstDaily = timer.daily && !solves.some(x => x.daily === timer.daily);
   const finite = solves.map(effTime).filter(isFinite);
   const prevBest = finite.length ? Math.min(...finite) : null;
@@ -3548,28 +3628,87 @@ function withSlices(recs) {
 }
 function phaseMoves(s, p) { return withSlices(s.moves.slice(p.a, p.b)); }
 
+/** Fluency 0–100 for the moves of the given phases: pauses between moves count only up to 0.4 s. */
+function fluencyOf(s, phaseList) {
+  let all = 0, smooth = 0;
+  for (const p of phaseList) for (let k = p.a + 1; k < p.b; k++) {
+    const g = Math.max(0, (s.moves[k] && s.moves[k - 1]) ? s.moves[k].t - s.moves[k - 1].t : 0);
+    all += g; smooth += Math.min(g, 400);
+  }
+  return all > 0 ? 100 * smooth / all : 100;
+}
 function renderDetail() {
   const s = solves.find(x => x.id === selectedId);
   $('detail').classList.toggle('hidden', !s);
   if (!s) return;
   const idx = solves.indexOf(s) + 1;
-  $('detailTitle').textContent = `Solve #${idx} · ${fmt(s.time)} · cross on ${s.crossFace}`;
-  let html = '<tr><th>Phase</th><th>Time</th><th>Recog.</th><th>Exec.</th><th>Turns</th><th>TPS</th></tr>';
-  for (const p of s.phases) {
-    let skip = p.turns === 0 ? ' <span style="color:var(--ok)">skip</span>' : '';
-    const ll = s.ll && s.ll[p.name.toLowerCase()];
-    if (ll && ll.id !== 'skip') {
-      const c = CASE_BY_ID.get(ll.id);
-      skip += ` <span class="ll-tag">${c ? caseLabel(c) : ll.id} ${ll.ok ? '<span style="color:var(--ok)">one-look</span>' : '<span style="color:var(--warn)">not one-look</span>'}</span>`;
-    }
-    const tps = p.exec > 0 ? (p.turns / (p.exec / 1000)).toFixed(2) : '–';
-    html += `<tr><td>${p.name}${skip}</td><td>${fmt(p.time)}</td><td>${fmt(p.recog)}</td><td>${fmt(p.exec)}</td><td>${p.turns}</td><td>${tps}</td></tr>`;
+  $('detailTitle').textContent = `Solve #${idx} · cross on ${{ U: 'white', D: 'yellow', F: 'green', B: 'blue', R: 'red', L: 'orange' }[s.crossFace] || s.crossFace}`;
+  const P = s.phases, total = Math.max(1, s.time);
+  const groups = [
+    { name: 'Cross', col: 'var(--s1)', parts: [P[0]] },
+    { name: 'F2L', col: 'var(--s2)', parts: P.slice(1, 5), sub: true },
+    { name: 'OLL', col: 'var(--s3)', parts: [P[5]], ll: 'oll' },
+    { name: 'PLL', col: 'var(--s4)', parts: [P[6]], ll: 'pll' },
+  ].map(g => {
+    const time = g.parts.reduce((a, p) => a + p.time, 0), turns = g.parts.reduce((a, p) => a + p.turns, 0);
+    return { ...g, time, turns, flu: fluencyOf(s, g.parts) };
+  });
+  const tps = (n, t) => t > 0 ? (n / (t / 1000)).toFixed(2) : '–';
+  const pct = (a, b) => b > 0 ? (100 * a / b).toFixed(1) + '%' : '–';
+  const overallFlu = groups.reduce((a, g) => a + g.flu * g.time, 0) / Math.max(1, groups.reduce((a, g) => a + g.time, 0));
+  $('anaTime').textContent = fmt(effTime(s)) + (s.plus2 ? '+' : '');
+  $('anaStats').innerHTML = `<span>TPS <b>${tps(s.moves.length, s.time)}</b></span><span>Moves <b>${s.moves.length}</b></span>` +
+    `<span>Fluency <b>${overallFlu.toFixed(1)}</b></span><span>Inspection <b>${s.insp != null ? (s.insp / 1000).toFixed(1) + ' s' : '–'}</b></span>`;
+  let html = '<tr><th>Step</th><th>Time</th><th>Proportion</th><th>Moves</th><th>TPS</th><th>Fluency</th></tr>';
+  for (const g of groups) {
+    let tag = '';
+    const ll = g.ll && s.ll && s.ll[g.ll];
+    if (ll && ll.id !== 'skip') { const c = CASE_BY_ID.get(ll.id); tag = ` <span class="ll-tag">${c ? caseLabel(c) : ll.id} ${ll.ok ? '<span style="color:var(--ok)">one-look</span>' : '<span style="color:var(--warn)">not one-look</span>'}</span>`; }
+    if (g.turns === 0) tag += ' <span style="color:var(--ok)">skip</span>';
+    html += `<tr class="grp"><td><span class="dot" style="background:${g.col}"></span>${g.name}${tag}</td><td>${fmt(g.time)}</td><td>${pct(g.time, total)}</td><td>${g.turns}</td><td>${tps(g.turns, g.time)}</td><td>${g.flu.toFixed(1)}</td></tr>`;
+    if (g.sub) g.parts.forEach((p, i) => {
+      html += `<tr class="sub"><td>F${i + 1}${p.turns === 0 ? ' <span style="color:var(--ok)">skip</span>' : ''}</td><td>${fmt(p.time)}</td><td>${pct(p.time, g.time)}</td><td>${p.turns}</td><td>${tps(p.turns, p.time)}</td><td>${fluencyOf(s, [p]).toFixed(1)}</td></tr>`;
+    });
   }
-  const total = s.moves.length;
-  html += `<tr><td><strong>Total</strong></td><td><strong>${fmt(s.time)}</strong></td><td>${fmt(s.phases.reduce((a, p) => a + p.recog, 0))}</td>` +
-    `<td>${fmt(s.phases.reduce((a, p) => a + p.exec, 0))}</td><td>${total}</td><td>${(total / Math.max(s.time / 1000, 0.01)).toFixed(2)}</td></tr>`;
   $('splits').innerHTML = html;
+  renderDonut(groups, total);
   $('recon').innerHTML = reconstruction(s).split('\n').map(l => l.replace(/^([^:]+):/, '<b>$1:</b>')).join('\n');
+}
+
+/** Donut of where the time went: Cross, the four F2L pairs (sub-slices), OLL, PLL — with % labels. */
+function renderDonut(groups, total) {
+  const box = $('anaDonut'), W = 280, H = 230, cx = W / 2, cy = H / 2, R = 78, r = 46;
+  const slices = [];
+  for (const g of groups) {
+    if (g.sub) g.parts.forEach((p, i) => slices.push({ name: `F2L · pair ${i + 1}`, t: p.time, col: g.col }));
+    else slices.push({ name: g.name, t: g.time, col: g.col });
+  }
+  const sum = slices.reduce((a, x) => a + x.t, 0) || 1;
+  let a0 = -Math.PI / 2, g = '';
+  const pt = (rad, ang) => [cx + rad * Math.cos(ang), cy + rad * Math.sin(ang)];
+  for (const sl of slices) {
+    if (sl.t <= 0) continue;
+    const a1 = a0 + 2 * Math.PI * sl.t / sum, large = a1 - a0 > Math.PI ? 1 : 0;
+    const [x0, y0] = pt(R, a0), [x1, y1] = pt(R, a1), [x2, y2] = pt(r, a1), [x3, y3] = pt(r, a0);
+    const d = a1 - a0 >= 2 * Math.PI - 1e-6
+      ? `M${cx - R},${cy}a${R},${R} 0 1,0 ${2 * R},0a${R},${R} 0 1,0 ${-2 * R},0M${cx - r},${cy}a${r},${r} 0 1,1 ${2 * r},0a${r},${r} 0 1,1 ${-2 * r},0`
+      : `M${x0},${y0}A${R},${R} 0 ${large} 1 ${x1},${y1}L${x2},${y2}A${r},${r} 0 ${large} 0 ${x3},${y3}Z`;
+    g += `<path class="slice" d="${d}" fill="${sl.col}" stroke="var(--chart-bg)" stroke-width="2" data-tip="${sl.name}: ${fmt(sl.t)} · ${(100 * sl.t / total).toFixed(1)}%"/>`;
+    const mid = (a0 + a1) / 2, share = 100 * sl.t / total;
+    if (share >= 4) {
+      const [lx, ly] = pt(R + 6, mid), [tx, ty] = pt(R + 20, mid);
+      g += `<line x1="${lx}" y1="${ly}" x2="${tx}" y2="${ty}" stroke="var(--muted)" stroke-width="1"/>` +
+        `<text class="axis" x="${tx + (Math.cos(mid) >= 0 ? 3 : -3)}" y="${ty + 4}" text-anchor="${Math.cos(mid) >= 0 ? 'start' : 'end'}">${share.toFixed(1)}%</text>`;
+    }
+    a0 = a1;
+  }
+  box.innerHTML = `<svg viewBox="0 0 ${W} ${H}" height="${H}" role="img" aria-label="Share of the solve time per step">${g}</svg><div class="tip"></div>`;
+  const tip = box.querySelector('.tip'), svg = box.querySelector('svg');
+  svg.querySelectorAll('.slice').forEach(el => {
+    el.addEventListener('pointerenter', e => { tip.textContent = el.dataset.tip; tip.style.display = 'block'; });
+    el.addEventListener('pointermove', e => { const b = svg.getBoundingClientRect(); tip.style.left = (e.clientX - b.left) + 'px'; tip.style.top = (e.clientY - b.top) + 'px'; });
+    el.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+  });
 }
 
 function reconstruction(s) {
@@ -4301,6 +4440,53 @@ $('patGrid').onclick = e => { const b = e.target.closest('[data-pat]'); if (b) s
 $('misReplay').onclick = replayMistake;
 $('misClose').onclick = hideMistake;
 $('xNew').onclick = crossNew;
+
+/* ----------------------------- Online (Supabase) ------------------------- */
+// Public project settings — the anon key is meant to be public; access is controlled by row-level security.
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+const SUPPORT_URL = '';
+let sbClient = null;
+const onlineReady = () => !!(SUPABASE_URL && SUPABASE_KEY);
+async function sb() {
+  if (!onlineReady()) throw new Error('Online features are not set up yet.');
+  if (!sbClient) {
+    if (!window.supabase) await loadScript(SUPABASE_JS);
+    sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+  }
+  return sbClient;
+}
+
+/* Feature requests go to the project's feature_requests table (insert-only for players). */
+$('btnFeature').onclick = () => { $('featureMsg').textContent = ''; $('featureDlg').showModal(); $('featureText').focus(); };
+$('featureClose').onclick = () => $('featureDlg').close();
+$('featureSend').onclick = async () => {
+  const message = $('featureText').value.trim(), contact = $('featureContact').value.trim();
+  if (message.length < 5) { $('featureMsg').textContent = 'Write a bit more first 🙂'; return; }
+  $('featureSend').disabled = true; $('featureMsg').textContent = 'Sending…';
+  try {
+    const db = await sb();
+    const { error } = await db.from('feature_requests').insert({ message, contact: contact || null, page: mode });
+    if (error) throw error;
+    $('featureText').value = ''; $('featureDlg').close(); toast('Thanks! Your idea was sent 💡');
+  } catch (e) {
+    $('featureMsg').textContent = onlineReady() ? 'Could not send: ' + (e.message || e) : 'Sending ideas works once the online features are set up.';
+  } finally { $('featureSend').disabled = false; }
+};
+$('btnSupport').onclick = () => {
+  if (SUPPORT_URL) { window.open(SUPPORT_URL, '_blank', 'noopener'); return; }
+  $('supportDlg').showModal();
+};
+$('supportClose').onclick = () => $('supportDlg').close();
+$('supportShare').onclick = async () => {
+  const url = location.origin + location.pathname;
+  try { if (navigator.share) await navigator.share({ title: 'Smart Cube', text: 'Smart cube trainer, timer and solver', url }); else { await navigator.clipboard.writeText(url); toast('Link copied ✓'); } }
+  catch (e) { /* cancelled */ }
+};
+$('btnCredits').onclick = e => { e.preventDefault(); $('creditsDlg').showModal(); };
+$('creditsClose').onclick = () => $('creditsDlg').close();
+for (const id of ['featureDlg', 'supportDlg', 'creditsDlg']) $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).close(); });
 
 $('netToggle').onclick = () => {
   const v = document.querySelector('.views');

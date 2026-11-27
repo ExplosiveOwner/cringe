@@ -148,6 +148,22 @@
   .stages li.cur { color: #fff; background: var(--accent); border-color: var(--accent); }
   .b-step { background: var(--panel2); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
   .b-title { font-size: 18px; font-weight: 700; }
+  /* 1v1 */
+  .lobby { display: grid; gap: 12px; }
+  .lobby input { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  .code-in { width: 7.5em; text-transform: uppercase; letter-spacing: .25em; font-weight: 700; }
+  .arena { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 4px; margin: 12px 0 4px; }
+  .pl-col { text-align: center; min-width: 0; }
+  .mini-scene { width: 120px; height: 120px; perspective: 500px; margin: 0 auto; max-width: 100%; }
+  .cube3d.mini { margin: 0; transform: scale(.62) rotateX(-28deg) rotateY(-38deg); }
+  .pl-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pl-time { font: 600 15px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; color: var(--muted); min-height: 1.3em; }
+  .pl-time.win { color: var(--ok); }
+  .vs-timer { font: 700 40px/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center; min-width: 4.2ch;
+    font-variant-numeric: tabular-nums; }
+  .vs-timer.count { color: var(--warn); }
+  .vs-score { text-align: center; color: var(--muted); font-weight: 700; margin-top: 6px; }
+  .big-code { font: 800 26px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; color: var(--accent); }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
 </style>
@@ -218,9 +234,10 @@
 
   <section>
     <div class="tabs">
-      <button data-tab="guide" class="active">Guided solve</button>
-      <button data-tab="timer">Timer &amp; stats</button>
+      <button data-tab="guide" class="active">Guide</button>
+      <button data-tab="timer">Timer</button>
       <button data-tab="train">Algorithms</button>
+      <button data-tab="vs">1v1</button>
     </div>
     <div id="solverStatus" class="msg" style="margin-top:0">Loading solver&hellip;</div>
 
@@ -299,6 +316,47 @@
       <h3>History</h3>
       <div class="history"><table id="history"></table></div>
       <div class="msg" id="historyMsg"></div>
+    </div>
+
+    <!-- 1v1: live race against another player -->
+    <div id="tab-vs" class="hidden">
+      <div id="vsLobby" class="lobby">
+        <label class="opts" style="margin:0">Your name <input id="vsName" maxlength="16" placeholder="Player"></label>
+        <div class="row"><button class="primary" id="vsCreate">Create game</button><span class="msg" style="margin:0">and share the code</span></div>
+        <div class="row">
+          <input id="vsCodeIn" class="code-in" maxlength="5" placeholder="CODE" autocomplete="off" autocapitalize="characters">
+          <button id="vsJoin">Join game</button>
+        </div>
+        <div class="msg" id="vsLobbyMsg"></div>
+        <div class="msg">Both players need this page open with their smart cube connected. Phones connect directly to each
+          other; the free PeerJS service is only used to find each other by the code.</div>
+      </div>
+      <div id="vsRoom" class="hidden">
+        <div class="row" style="justify-content:space-between">
+          <div>Code <span class="big-code" id="vsCodeShow"></span></div>
+          <button id="vsLeave">Leave</button>
+        </div>
+        <div class="arena">
+          <div class="pl-col"><div class="mini-scene" id="vsMeCube"></div><div class="pl-name" id="vsMeName"></div><div class="pl-time" id="vsMeTime"></div></div>
+          <div><div class="vs-timer" id="vsTimer">0.00</div><div class="vs-score" id="vsScore">0 – 0</div></div>
+          <div class="pl-col"><div class="mini-scene" id="vsOppCube"></div><div class="pl-name" id="vsOppName"></div><div class="pl-time" id="vsOppTime"></div></div>
+        </div>
+        <div class="timer-note" id="vsNote"></div>
+        <div id="vsScr" class="hidden" style="margin-top:10px">
+          <div class="scr-alg" id="vsAlg"></div>
+          <div class="next" style="margin-bottom:8px">
+            <div class="mv" id="vNext" style="font-size:40px">&ndash;</div>
+            <div class="sub" id="vSub"></div>
+          </div>
+          <div class="moves" id="vMoves"></div>
+          <div class="bar"><div id="vProg"></div></div>
+          <div class="msg" id="vProgText"></div>
+        </div>
+        <div class="row" style="margin-top:12px;justify-content:center">
+          <button class="primary" id="vsRound">Start round</button>
+          <button id="vsGiveUp" class="hidden">Give up</button>
+        </div>
+      </div>
     </div>
 
     <!-- Algorithms: trainer + memorisation tracking -->
@@ -1739,6 +1797,284 @@ function renderTrainTab() {
   renderLegend(); renderCaseGrid(); renderCaseDetail(); renderTrainer();
 }
 
+/* -------------------------------- 1v1 ------------------------------------
+ * Two phones connect directly (WebRTC via PeerJS); the free PeerJS cloud server only matches them by
+ * the join code. Messages: hi, state, round, ready, go, done.
+ * ------------------------------------------------------------------------- */
+const PEERJS_URL = 'https://cdn.jsdelivr.net/npm/peerjs@1.5.5/dist/peerjs.min.js';
+const PEER_PREFIX = 'micube-1v1-';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';     // no 0/O, 1/I look-alikes
+const vtrk = new Tracker('v');
+const vs = { peer: null, conn: null, code: '', host: false, oppName: '', oppState: SOLVED, phase: 'idle',
+  scramble: '', target: null, meReady: false, oppReady: false, t0: 0, myTime: undefined, oppTime: undefined,
+  score: [0, 0], raf: 0, busy: false, countTimer: 0 };
+let vsMeView = null, vsOppView = null;
+
+function makeMiniCube(container) {
+  const holder = document.createElement('div');
+  holder.className = 'cube3d mini';
+  container.appendChild(holder);
+  const cbs = [], st = [];
+  for (let x = -1; x <= 1; x++) for (let y = -1; y <= 1; y++) for (let z = -1; z <= 1; z++) {
+    if (!x && !y && !z) continue;
+    const el = document.createElement('div');
+    el.className = 'cubie';
+    el.style.transform = `translate3d(${x * CUBIE}px, ${-y * CUBIE}px, ${z * CUBIE}px)`;
+    const outside = { U: y === 1, D: y === -1, R: x === 1, L: x === -1, F: z === 1, B: z === -1 }, planes = {};
+    for (const f of FACES) {
+      if (!outside[f]) continue;
+      const pl = document.createElement('div');
+      pl.className = 'pl';
+      pl.style.transform = `${PLANE_T[f]} translateZ(${CUBIE / 2}px)`;
+      el.appendChild(pl); planes[f] = pl;
+    }
+    holder.appendChild(el);
+    cbs.push({ x, y, z, planes });
+  }
+  for (let fi = 0; fi < 6; fi++) for (let i = 0; i < 9; i++) {
+    const [x, y, z] = faceletPos(FACES[fi], i);
+    const sticker = document.createElement('div');
+    cbs.find(c => c.x === x && c.y === y && c.z === z).planes[FACES[fi]].appendChild(sticker);
+    st[fi * 9 + i] = sticker;
+  }
+  return { paint(s) { for (let i = 0; i < 54; i++) st[i].style.backgroundColor = `var(--c${s[i]})`; } };
+}
+
+const vsName = () => ($('vsName').value.trim() || 'Player').slice(0, 16);
+const randCode = () => Array.from(crypto.getRandomValues(new Uint8Array(5)), b => CODE_CHARS[b % CODE_CHARS.length]).join('');
+function peerOptions() {        // ?peer=host:port uses a self-hosted PeerServer (for testing)
+  const q = new URLSearchParams(location.search).get('peer');
+  if (!q) return {};
+  const [host, port] = q.split(':');
+  return { host, port: Number(port) || 9000, path: '/', secure: location.protocol === 'https:' };
+}
+function openPeer(id) {
+  return new Promise((res, rej) => {
+    const p = id ? new Peer(id, peerOptions()) : new Peer(peerOptions());
+    const onErr = e => { p.off('open'); rej(e); };
+    p.on('open', () => { p.off('error', onErr); p.on('error', vsPeerError); res(p); });
+    p.on('error', onErr);
+  });
+}
+function vsPeerError(e) {
+  log('1v1: ' + (e.type || '') + ' ' + e.message);
+  if (e.type === 'peer-unavailable') { vsLobbyMsg('No game found with that code — check it and try again.'); vsLeave(true); }
+  else if (!vs.conn) vsLobbyMsg('Connection problem: ' + (e.message || e.type));
+}
+const vsLobbyMsg = t => { $('vsLobbyMsg').textContent = t; };
+async function vsLoadPeer() { if (!window.Peer) await loadScript(PEERJS_URL); }
+
+async function vsCreate() {
+  try {
+    vsLobbyMsg('Creating game…');
+    await vsLoadPeer();
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = randCode();
+      try {
+        const peer = await openPeer(PEER_PREFIX + code);
+        Object.assign(vs, { peer, code, host: true, score: [0, 0], phase: 'idle', oppName: '' });
+        peer.on('connection', c => { if (vs.conn && vs.conn.open) { c.on('open', () => c.close()); return; } vsSetupConn(c); });
+        vsLobbyMsg(''); vsRender();
+        return;
+      } catch (e) { if (e.type !== 'unavailable-id') throw e; }
+    }
+    throw new Error('could not get a free code');
+  } catch (e) { vsLobbyMsg('Could not create a game: ' + (e.message || e.type)); }
+}
+
+async function vsJoin() {
+  const code = $('vsCodeIn').value.trim().toUpperCase();
+  if (!/^[A-Z0-9]{5}$/.test(code)) { vsLobbyMsg('Enter the 5-character code from the other player.'); return; }
+  try {
+    vsLobbyMsg('Joining ' + code + '…');
+    await vsLoadPeer();
+    const peer = await openPeer(null);
+    Object.assign(vs, { peer, code, host: false, score: [0, 0], phase: 'idle', oppName: '' });
+    vsSetupConn(peer.connect(PEER_PREFIX + code, { reliable: true }));
+    setTimeout(() => {
+      if (vs.peer === peer && !(vs.conn && vs.conn.open)) { vsLeave(true); vsLobbyMsg(`No game found with code ${code} — check it and try again.`); }
+    }, 10000);
+  } catch (e) { vsLobbyMsg('Could not join: ' + (e.message || e.type)); }
+}
+
+function vsSetupConn(c) {
+  vs.conn = c;
+  c.on('open', () => { vsLobbyMsg(''); vsSend({ t: 'hi', name: vsName(), s: current }); vsRender(); });
+  c.on('data', vsOnData);
+  c.on('close', () => {
+    vs.conn = null; vs.oppName = ''; vs.oppReady = false;
+    if (vs.phase !== 'idle') vsEndRound(true);
+    vsNote('Your opponent left.' + (vs.host ? ' Share the code to play again.' : ''));
+    if (!vs.host) vsLeave(true); else vsRender();
+  });
+}
+const vsSend = m => { if (vs.conn && vs.conn.open) vs.conn.send(m); };
+const vsNote = t => { $('vsNote').textContent = t; };
+
+function vsOnData(m) {
+  if (!m || typeof m !== 'object') return;
+  if (m.t === 'hi') { vs.oppName = String(m.name || 'Opponent').slice(0, 16); if (typeof m.s === 'string' && colorCountsOk(m.s)) vs.oppState = m.s; vsRender(); }
+  else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) { vs.oppState = m.s; if (vsOppView) vsOppView.paint(m.s); }
+  else if (m.t === 'round' && typeof m.scramble === 'string') vsStartRound(m.scramble);
+  else if (m.t === 'ready') { vs.oppReady = !!m.v; vsMaybeGo(); vsRender(); }
+  else if (m.t === 'go') vsGo();
+  else if (m.t === 'done') { vs.oppTime = typeof m.time === 'number' ? m.time : null; vsCheckFinish(); vsRender(); }
+}
+
+async function vsNewRound() {
+  if (!vs.host || !vs.conn || !solver.ready) return;
+  const scramble = (await solver.scramble()).trim();
+  vsSend({ t: 'round', scramble });
+  vsStartRound(scramble);
+}
+
+async function vsStartRound(scramble) {
+  cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
+  Object.assign(vs, { phase: 'scrambling', scramble, target: applyMoves(SOLVED, scramble), meReady: false, oppReady: false,
+    myTime: undefined, oppTime: undefined });
+  $('vsTimer').textContent = '0.00';
+  vsNote('Apply the scramble.');
+  vtrk.clear();
+  vsRender();
+  await vsReplan();
+}
+
+async function vsReplan(reason) {
+  if (vs.busy) return;
+  vs.busy = true;
+  vsNote((reason ? reason + ' ' : '') + 'Calculating scramble moves…');
+  const from = current, scr = vs.scramble;
+  let moves;
+  try { moves = await pathTo(from, scr); } catch (e) { vs.busy = false; vsNote('Error: ' + e.message); return; }
+  vs.busy = false;
+  if (vs.phase !== 'scrambling' || scr !== vs.scramble) return;
+  vtrk.set(moves, from);
+  if (current !== from && !vtrk.track(current)) { vsReplan('Off track.'); return; }
+  vsCheckReady();
+  vsRender();
+}
+
+function vsCheckReady() {
+  const ready = vs.phase === 'scrambling' && current === vs.target;
+  if (ready !== vs.meReady) { vs.meReady = ready; vsSend({ t: 'ready', v: ready }); }
+  vsNote(vs.meReady ? (vs.oppReady ? 'Both ready…' : `Ready! Waiting for ${vs.oppName || 'your opponent'}…`) : 'Apply the scramble.');
+  vsMaybeGo();
+}
+
+function vsMaybeGo() {
+  if (vs.host && vs.phase === 'scrambling' && vs.meReady && vs.oppReady) { vsSend({ t: 'go' }); vsGo(); }
+}
+
+function vsGo() {
+  if (vs.phase !== 'scrambling') return;
+  vs.phase = 'countdown';
+  let n = 3;
+  const tick = () => {
+    if (vs.phase !== 'countdown') return;
+    if (n > 0) { $('vsTimer').textContent = String(n); $('vsTimer').className = 'vs-timer count'; vsNote('Get ready…'); n--; vs.countTimer = setTimeout(tick, 1000); return; }
+    vs.phase = 'running'; vs.t0 = performance.now();
+    $('vsTimer').className = 'vs-timer';
+    vsNote('Go!');
+    const loop = () => {
+      if (vs.phase !== 'running') return;
+      $('vsTimer').textContent = fmt(performance.now() - vs.t0);
+      vs.raf = requestAnimationFrame(loop);
+    };
+    loop();
+    vsRender();
+  };
+  tick();
+  vsRender();
+}
+
+function vsFinishMine(time) {
+  if (vs.myTime !== undefined) return;
+  vs.myTime = time;
+  vsSend({ t: 'done', time });
+  vsCheckFinish();
+  vsRender();
+}
+
+function vsCheckFinish() {
+  if (vs.phase !== 'running' && vs.phase !== 'countdown') return;
+  if (vs.myTime === undefined || vs.oppTime === undefined) {
+    if (vs.myTime !== undefined) vsNote(vs.myTime === null ? 'You gave up.' : `Done in ${fmt(vs.myTime)} — waiting for ${vs.oppName || 'your opponent'}…`);
+    else if (vs.oppTime !== undefined) vsNote(`${vs.oppName || 'Opponent'} finished${vs.oppTime === null ? ' (gave up)' : ' in ' + fmt(vs.oppTime)} — keep going!`);
+    return;
+  }
+  vsEndRound(false);
+}
+
+function vsEndRound(aborted) {
+  cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
+  vs.phase = 'idle'; vtrk.clear();
+  $('vsTimer').className = 'vs-timer';
+  if (aborted) { vsRender(); return; }
+  const me = vs.myTime, op = vs.oppTime;
+  let res;
+  if (me == null && op == null) res = 'Nobody finished.';
+  else if (op == null || (me != null && me < op)) { vs.score[0]++; res = `You win! ${fmt(me)}` + (op != null ? ` vs ${fmt(op)}` : ''); }
+  else if (me == null || op < me) { vs.score[1]++; res = `${vs.oppName || 'Opponent'} wins: ${fmt(op)}` + (me != null ? ` vs ${fmt(me)}` : ''); }
+  else res = `Tie! ${fmt(me)}`;
+  $('vsTimer').textContent = me != null ? fmt(me) : 'DNF';
+  vsNote(res + (vs.host ? '' : ' — waiting for the host to start the next round.'));
+  vsRender();
+}
+
+function vsOnState(prev) {
+  vsSend({ t: 'state', s: current });
+  if (vsMeView) vsMeView.paint(current);
+  if (vs.phase === 'scrambling') {
+    if (vs.busy) return;
+    if (!vtrk.track(current)) { vsCheckReady(); vsReplan('Off track.'); return; }
+    vsCheckReady(); vsRender();
+  } else if (vs.phase === 'running' && current === SOLVED && vs.myTime === undefined) {
+    vsFinishMine(Math.round(performance.now() - vs.t0));
+  }
+}
+
+function vsLeave(keepMsg) {
+  cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
+  try { if (vs.conn) vs.conn.close(); } catch (e) { /* ignore */ }
+  try { if (vs.peer) vs.peer.destroy(); } catch (e) { /* ignore */ }
+  Object.assign(vs, { peer: null, conn: null, code: '', phase: 'idle', oppName: '', oppState: SOLVED });
+  vtrk.clear();
+  if (!keepMsg) vsLobbyMsg('');
+  vsRender();
+}
+
+function vsRender() {
+  const inRoom = !!vs.peer && (vs.host || (vs.conn && vs.conn.open));
+  $('vsLobby').classList.toggle('hidden', inRoom);
+  $('vsRoom').classList.toggle('hidden', !inRoom);
+  if (!inRoom) return;
+  if (!vsMeView) { vsMeView = makeMiniCube($('vsMeCube')); vsOppView = makeMiniCube($('vsOppCube')); }
+  vsMeView.paint(current); vsOppView.paint(vs.oppState);
+  $('vsCodeShow').textContent = vs.code;
+  $('vsMeName').textContent = vsName() + ' (you)';
+  $('vsOppName').textContent = vs.conn && vs.conn.open ? (vs.oppName || 'Opponent') : 'Waiting…';
+  const t = (v, ready) => v === undefined ? (ready ? 'ready ✓' : '') : v === null ? 'DNF' : fmt(v);
+  $('vsMeTime').textContent = t(vs.myTime, vs.phase === 'scrambling' && vs.meReady);
+  $('vsOppTime').textContent = t(vs.oppTime, vs.phase === 'scrambling' && vs.oppReady);
+  const done = vs.myTime !== undefined && vs.oppTime !== undefined && vs.phase === 'idle';
+  $('vsMeTime').classList.toggle('win', done && vs.myTime != null && (vs.oppTime == null || vs.myTime < vs.oppTime));
+  $('vsOppTime').classList.toggle('win', done && vs.oppTime != null && (vs.myTime == null || vs.oppTime < vs.myTime));
+  $('vsScore').textContent = `${vs.score[0]} – ${vs.score[1]}`;
+  $('vsScr').classList.toggle('hidden', vs.phase !== 'scrambling');
+  $('vsAlg').textContent = vs.scramble;
+  if (vs.phase === 'scrambling') {
+    if (vs.busy || !vtrk.active) vtrk.renderMessage('…', 'Calculating…');
+    else if (vs.meReady) vtrk.renderMessage('✓', 'Scramble done');
+    else vtrk.renderSteps();
+  }
+  $('vsRound').classList.toggle('hidden', !vs.host || vs.phase !== 'idle');
+  $('vsRound').disabled = !(vs.conn && vs.conn.open) || !solver.ready;
+  $('vsRound').textContent = vs.score[0] + vs.score[1] ? 'Next round' : 'Start round';
+  $('vsGiveUp').classList.toggle('hidden', vs.phase !== 'running' || vs.myTime !== undefined);
+  if (vs.phase === 'idle' && vs.host && !(vs.conn && vs.conn.open)) vsNote(`Share the code ${vs.code} — waiting for someone to join…`);
+  else if (vs.phase === 'idle' && vs.myTime === undefined) vsNote(vs.host ? 'Press “Start round” when you\'re both ready.' : 'Waiting for the host to start a round…');
+}
+
 /* ------------------------------- History --------------------------------- */
 let solves = [];
 let selectedId = null;
@@ -1900,6 +2236,7 @@ function onStateChange(state, move) {
   if (!replay.active) render(current, prev, moves);
   if (mode === 'timer') timerOnState(prev, moves || (timer.phase === 'running' ? ['?'] : []));
   else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
+  else if (mode === 'vs') vsOnState(prev);
   else guideOnState(move || (moves && moves[0]));
 }
 
@@ -1918,9 +2255,13 @@ function setMode(m) {
   $('tab-guide').classList.toggle('hidden', m !== 'guide');
   $('tab-timer').classList.toggle('hidden', m !== 'timer');
   $('tab-train').classList.toggle('hidden', m !== 'train');
+  $('tab-vs').classList.toggle('hidden', m !== 'vs');
   try { localStorage.setItem('micube.tab', m); } catch (e) { /* ignore */ }
   if (m !== 'train' && train.phase !== 'off') stopTraining();
-  if (m === 'train') {
+  if (m === 'vs') {
+    if (timer.phase === 'running' || timer.phase === 'ready') cancelRun();
+    vsRender();
+  } else if (m === 'train') {
     if (timer.phase === 'running' || timer.phase === 'ready') cancelRun();
     renderTrainTab();
   } else if (m === 'timer') {
@@ -2361,6 +2702,16 @@ $('caseGrid').onclick = e => {
   renderCaseGrid(); renderCaseDetail();
   if (selectedCase) $('caseDetail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
+try { $('vsName').value = localStorage.getItem('micube.name') || ''; } catch (e) { /* ignore */ }
+$('vsName').onchange = () => { try { localStorage.setItem('micube.name', vsName()); } catch (e) { /* ignore */ } };
+$('vsCreate').onclick = vsCreate;
+$('vsJoin').onclick = vsJoin;
+$('vsCodeIn').onkeydown = e => { if (e.key === 'Enter') vsJoin(); };
+$('vsCodeIn').oninput = e => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); };
+$('vsLeave').onclick = () => vsLeave();
+$('vsRound').onclick = vsNewRound;
+$('vsGiveUp').onclick = () => vsFinishMine(null);
+window.addEventListener('beforeunload', () => { try { if (vs.peer) vs.peer.destroy(); } catch (e) { /* ignore */ } });
 $('rpPlay').onclick = () => playReplay(!replay.playing);
 $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };
@@ -2420,7 +2771,7 @@ if (typeof Cube === 'undefined') {
   let saved = 'guide';
   try { saved = localStorage.getItem('micube.tab') || 'guide'; } catch (e) { /* ignore */ }
   buildCases();
-  setMode(['timer', 'train'].includes(saved) ? saved : 'guide');
+  setMode(['timer', 'train', 'vs'].includes(saved) ? saved : 'guide');
   solver.init();
   autoReconnect();
 }

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Smart Cube Solver</title>
 <!-- Kociemba two-phase solver (cubejs). cube.js is used on the main thread for state simulation;
      cube.js + solve.js are also loaded inside a Web Worker so solver init doesn't freeze the UI. -->
@@ -48,8 +48,10 @@
 
   /* 3D cube */
   .views { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
-  .scene { width: 210px; height: 210px; perspective: 700px; touch-action: none; cursor: grab; flex: none; }
-  .cube3d { position: relative; width: 120px; height: 120px; margin: 45px; transform-style: preserve-3d; }
+  .scene { --s: 1; width: calc(210px * var(--s)); height: calc(210px * var(--s)); perspective: calc(700px * var(--s));
+    touch-action: none; cursor: grab; flex: none; }
+  .cube3d { position: relative; width: 120px; height: 120px; margin: calc((210px * var(--s) - 120px) / 2); transform-style: preserve-3d; }
+  .net-toggle { display: none; font-size: 12px; padding: 2px 8px; }
   .cubie { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; transform-style: preserve-3d; }
   .pl { position: absolute; inset: 0; background: #111; backface-visibility: hidden; }
   .cap { position: absolute; left: 0; top: 0; width: 120px; height: 120px; background: #111; }
@@ -166,6 +168,46 @@
   .big-code { font: 800 26px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .2em; color: var(--accent); }
   details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
   label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 14px; color: var(--muted); }
+
+  /* ---------- PC: wide screens ---------- */
+  @media (min-width: 1100px) {
+    main { grid-template-columns: minmax(420px, 500px) minmax(0, 1fr); max-width: 1480px; gap: 20px; padding: 20px; }
+    #liveSection { position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; }
+    .scene { --s: 1.45; }
+    .timer { font-size: 96px; }
+    .vs-timer { font-size: 64px; }
+    .mini-scene { width: 170px; height: 170px; }
+    .cube3d.mini { transform: scale(.95) rotateX(-28deg) rotateY(-38deg); margin: 25px; }
+    .next .mv { font-size: 72px; }
+  }
+
+  /* ---------- Phone ---------- */
+  @media (max-width: 700px) {
+    header { padding: 8px 12px; gap: 6px; }
+    h1 { font-size: 15px; }
+    header .row { gap: 6px; }
+    header button { padding: 5px 9px; font-size: 13px; }
+    .status { font-size: 12px; flex-basis: 100%; order: 3; }
+    main { padding: 8px; gap: 10px; padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+    section { padding: 10px; border-radius: 10px; }
+    #liveSection h2 { display: none; }
+    .scene { --s: .82; }
+    .views { gap: 8px; }
+    .views .net { display: none; }
+    .views.show-net .net { display: grid; }
+    #extras { display: none; }
+    #extras.open { display: block; }
+    .net-toggle { display: inline-block; }
+    body[data-mode="vs"] #liveSection { display: none; }
+    /* app-style bottom tab bar */
+    .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 20; margin: 0; background: var(--panel);
+      border-top: 1px solid var(--line); border-bottom: none; padding: 0 4px env(safe-area-inset-bottom); }
+    .tabs button { flex: 1; padding: 12px 2px 10px; font-size: 13px; border-bottom: none; border-top: 2px solid transparent; }
+    .tabs button.active { border-top-color: var(--accent); }
+    .timer { font-size: 52px; }
+    .next .mv { font-size: 44px; }
+    .tiles .v { font-size: 17px; }
+  }
 </style>
 </head>
 <body>
@@ -180,12 +222,13 @@
 </header>
 
 <main>
-  <section>
+  <section id="liveSection">
     <h2>Live cube</h2>
     <div class="views">
       <div>
         <div class="scene" id="scene"><div class="cube3d" id="cube3d"></div></div>
-        <div class="hint">Drag to rotate &middot; <label class="chk" style="font-size:12px"><input type="checkbox" id="animToggle" checked> Animate turns</label></div>
+        <div class="hint">Drag to rotate &middot; <label class="chk" style="font-size:12px"><input type="checkbox" id="animToggle" checked> Animate turns</label>
+          <button class="net-toggle" id="netToggle">Flat view</button> <button class="net-toggle" id="moreToggle">More</button></div>
       </div>
       <div class="net" id="net"></div>
     </div>
@@ -204,6 +247,7 @@
       <div class="msg" id="replayMove"></div>
     </div>
 
+    <div id="extras">
     <div class="row" style="margin-top:12px">
       <button id="btnMarkSolved" disabled title="Tells the cube its current physical state is solved (use if the cube's internal state got out of sync)">Mark cube as solved</button>
       <span class="msg" id="battery" style="margin:0"></span>
@@ -230,6 +274,7 @@
       <summary>Bluetooth log</summary>
       <div class="log" id="log"></div>
     </details>
+    </div>
   </section>
 
   <section>
@@ -921,8 +966,13 @@ function render(state, prev, moves) {
 (function setupDrag() {
   const scene = document.getElementById('scene');
   let rx = -28, ry = -38, drag = null;
-  const apply = () => { cube3d.style.transform = `rotateX(${rx}deg) rotateY(${ry}deg)`; };
+  // The scene's size comes from CSS (--s: bigger on PC, smaller on phones); the cube scales with it.
+  const apply = () => {
+    const sc = parseFloat(getComputedStyle(scene).getPropertyValue('--s')) || 1;
+    cube3d.style.transform = `scale(${sc}) rotateX(${rx}deg) rotateY(${ry}deg)`;
+  };
   apply();
+  window.addEventListener('resize', apply);
   scene.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, rx, ry }; scene.setPointerCapture(e.pointerId); scene.style.cursor = 'grabbing'; });
   scene.addEventListener('pointermove', e => {
     if (!drag) return;
@@ -2251,6 +2301,7 @@ function onSolverReady() {
 
 function setMode(m) {
   mode = m;
+  document.body.dataset.mode = m;
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('active', b.dataset.tab === m));
   $('tab-guide').classList.toggle('hidden', m !== 'guide');
   $('tab-timer').classList.toggle('hidden', m !== 'timer');
@@ -2712,6 +2763,15 @@ $('vsLeave').onclick = () => vsLeave();
 $('vsRound').onclick = vsNewRound;
 $('vsGiveUp').onclick = () => vsFinishMine(null);
 window.addEventListener('beforeunload', () => { try { if (vs.peer) vs.peer.destroy(); } catch (e) { /* ignore */ } });
+$('moreToggle').onclick = () => {
+  const open = $('extras').classList.toggle('open');
+  $('moreToggle').textContent = open ? 'Less' : 'More';
+};
+$('netToggle').onclick = () => {
+  const v = document.querySelector('.views');
+  v.classList.toggle('show-net');
+  $('netToggle').textContent = v.classList.contains('show-net') ? 'Hide flat view' : 'Flat view';
+};
 $('rpPlay').onclick = () => playReplay(!replay.playing);
 $('rpExit').onclick = exitReplay;
 $('rpSlider').oninput = e => { playReplay(false); showFrame(Number(e.target.value)); replay.time = replay.frames[replay.idx].t; };

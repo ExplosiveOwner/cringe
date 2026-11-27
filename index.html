@@ -323,7 +323,10 @@
       </div>
       <div id="bPanel" class="hidden">
         <ol class="stages" id="bStages"></ol>
-        <div class="opts" style="margin:-6px 0 8px"><label>Grip after the flower <select id="bGrip"><option value="white">White on top</option><option value="yellow">Yellow on top</option></select></label></div>
+        <div class="opts" style="margin:-6px 0 8px">
+          <label>Grip after the flower <select id="bGrip"><option value="white">White on top</option><option value="yellow">Yellow on top</option></select></label>
+          <label>Last layer <select id="bLL"><option value="fish">Fish (Rubik's guide)</option><option value="classic">Twist corners</option></select></label>
+        </div>
         <div class="msg" id="bHold" style="margin:0 0 10px"></div>
         <div class="b-step">
           <div class="b-title" id="bTitle"></div>
@@ -817,6 +820,10 @@ const BEGINNER_DATA = [
   { id: 'b-ycross', name: 'Yellow cross', nick: '', subset: 'step 5 · yellow cross', algs: ["F R U R' U' F'"] },
   { id: 'b-yedges', name: 'Yellow edges', nick: 'Sune', subset: 'step 6 · yellow edges', algs: ["R U R' U R U2 R'"] },
   { id: 'b-ycorners', name: 'Place yellow corners', nick: '', subset: 'step 7 · place corners', algs: ["U R U' L' U R' U' L"] },
+  { id: 'b-fish', name: 'Yellow face', nick: 'fish (Sune)', subset: 'step 6 · fish method', algs: ["R U R' U R U2 R'"] },
+  { id: 'b-headlights', name: 'Yellow corners', nick: 'headlights', subset: 'step 7 · fish method', algs: ["R' F R' B2 R F' R' B2 R2"] },
+  { id: 'b-uperm', name: 'Yellow edges', nick: 'U-perm', subset: 'step 8 · fish method', algs: ["M2 U M U2 M' U M2"] },
+  { id: 'b-uperm-2', name: 'Yellow edges', nick: 'U-perm, other way', subset: 'step 8 · fish method', algs: ["M2 U' M U2 M' U' M2", "F2 U L R' F2 L' R U F2"] },
   { id: 'b-twist-right', name: 'Twist corner', nick: 'yellow facing right', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D"],
     white: { id: 'b-twist-right-w', algs: ["L D L' D' L D L' D'"] } },
   { id: 'b-twist-front', name: 'Twist corner', nick: 'yellow facing front', subset: 'step 8 · twist corners', algs: ["R' D' R D R' D' R D R' D' R D R' D' R D"],
@@ -1231,7 +1238,16 @@ class Tracker {
   set(moves, start) {
     this.moves = moves;
     this.states = [start];
-    for (const m of moves) this.states.push(applyMoves(this.states[this.states.length - 1], m));
+    this.partials = [];
+    const slices = moves.some(m => 'MES'.includes(m[0]));
+    for (let k = 0; k < moves.length; k++) {
+      const prev = this.states[k];
+      // A middle-layer turn moves the centres; the cube reports it in its own frame (M = R + L'),
+      // so states are re-oriented to standard centres after each step.
+      const next = slices ? applyFixed(start, moves.slice(0, k + 1)) : applyMoves(prev, moves[k]);
+      this.states.push(next);
+      this.partials.push('MES'.includes(moves[k][0]) ? tuPartials(prev, next) : []);
+    }
     this.idx = 0; this.half = false; this.active = true;
   }
   clear() { this.moves = []; this.states = []; this.idx = 0; this.half = false; this.active = false; }
@@ -1243,7 +1259,8 @@ class Tracker {
       if (this.states[k] === s) { this.idx = k; this.half = false; return true; }
     }
     const m = this.moves[this.idx];
-    if (m && m.endsWith('2')) {
+    if (m && this.partials && this.partials[this.idx] && this.partials[this.idx].includes(s)) { this.half = true; return true; }
+    if (m && m.endsWith('2') && !'MES'.includes(m[0])) {
       const base = this.states[this.idx];
       if (applyMoves(base, m[0]) === s || applyMoves(base, m[0] + "'") === s) { this.half = true; return true; }
     }
@@ -1268,7 +1285,8 @@ class Tracker {
     });
     const m = this.moves[this.idx];
     Next.textContent = m ? this.view(m) : '✓';
-    Sub.innerHTML = m ? (this.half ? 'one more quarter turn, same direction' : describeMove(this.view(m), m[0])) : '';
+    Sub.innerHTML = m ? (this.half ? ('MES'.includes(m[0]) ? 'finish the middle-layer turn' : 'one more quarter turn, same direction')
+      : describeMove(this.view(m), m[0])) : '';
     Prog.style.width = (this.moves.length ? 100 * this.idx / this.moves.length : 100) + '%';
     ProgText.textContent = this.moves.length ? `Step ${Math.min(this.idx + 1, this.moves.length)} of ${this.moves.length}` : '';
   }
@@ -1276,7 +1294,13 @@ class Tracker {
 
 const FACE_NAMES = { U: 'Top', D: 'Bottom', R: 'Right', L: 'Left', F: 'Front', B: 'Back' };
 /** HTML: colour swatch + face + direction. */
+/** Apply moves that may include slice moves, then re-orient so the centres are standard (the cube's own frame). */
+function applyFixed(state, moves) {
+  const alg = normAlg(Array.isArray(moves) ? moves.join(' ') : moves);
+  return applyMoves(state, normAlg(alg + ' ' + reorientFor(alg)));
+}
 function describeMove(m, colorFace = m[0]) {
+  if ('MES'.includes(m[0])) return tuMeaning(m);
   const how = m.endsWith('2') ? '180°' : m.endsWith("'") ? 'counter-clockwise' : 'clockwise';
   return `<span class="sw" style="background:var(--c${colorFace})"></span>${FACE_NAMES[m[0]]} face, ${how}`;
 }
@@ -1307,12 +1331,13 @@ function renderGuide() {
   $('btnSolve').textContent = beginner ? 'Show next step' : 'Solve current state';
   if (beginner) {
     const stage = current === SOLVED ? 9 : bPlan ? bPlan.stage : 0;
-    $('bStages').innerHTML = B_STAGES.map((n, i) => `<li class="${i + 1 < stage ? 'done' : i + 1 === stage ? 'cur' : ''}">${i + 1}. ${n}</li>`).join('');
+    $('bLL').value = begLL;
+    $('bStages').innerHTML = bStages().map((n, i) => `<li class="${i + 1 < stage ? 'done' : i + 1 === stage ? 'cur' : ''}">${i + 1}. ${n}</li>`).join('');
     $('bTitle').textContent = current === SOLVED ? 'Solved! 🎉' : bPlan ? bPlan.title : 'Beginner method';
     $('bText').textContent = current === SOLVED ? '' : bWaiting
       ? `Keep going — finish your algorithm. Steps 1–${bPlan.stage - 1} stay done; I'll continue as soon as they're back in place.`
       : bPlan ? bPlan.text
-      : 'Hold the cube with yellow on top and green in front, and keep it that way. Scramble it, then press “Show next step”.';
+      : 'Scramble your cube, hold it with yellow on top and green in front, then turn it once or press “Show next step” — the first step appears.';
     $('bAlg').textContent = current !== SOLVED && bPlan ? (grip === 'white' ? flipAlgText(bPlan.alg) : bPlan.alg) : '';
     $('bGrip').value = begGrip;
     $('bHold').innerHTML = !bPlan || bPlan.stage === 1
@@ -1326,7 +1351,7 @@ function renderGuide() {
   } else if (beginner && bWaiting) {
     guide.renderMessage('…', 'Keep going — finish your algorithm');
   } else if (!guide.active) {
-    guide.renderMessage('–', solver.ready ? 'Scramble the cube, then press “Solve”.' : '');
+    guide.renderMessage('–', !solver.ready ? '' : beginner ? 'Turn your scrambled cube (or press “Show next step”) to begin.' : 'Scramble the cube, then press “Solve current state”.');
   } else {
     guide.renderSteps();
   }
@@ -1358,12 +1383,12 @@ async function solveNow(reason) {
 function guideOnState(move) {
   if (guideMethod === 'beginner') {
     if (current === SOLVED) { guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
-    if (!bPlan) { renderGuide(); return; }
+    if (!bPlan) { beginnerStep(); return; }          // start guiding as soon as the cube moves
     const onTrack = guide.active && guide.track(current);
     if (onTrack && guide.idx === guide.moves.length) { beginnerStep(); return; }   // step finished
     if (!onTrack) {
       // Mid-twist the bottom looks scrambled, so keep twisting rather than restarting from step 1.
-      if (bPlan.stage === 8) {
+      if (bPlan.stage === 8 && begLL === 'classic') {
         const tw = twistPlan(userView(current), begGrip);
         if (tw) { bPlan = { ...bPlan, moves: tw }; guide.set(tw.map(flipMove), current); renderGuide(); return; }
       }
@@ -1386,9 +1411,22 @@ function guideOnState(move) {
  * yellow on top, green in front, which is the cube's own frame turned upside down (z2).
  * ------------------------------------------------------------------------- */
 const Z2_FACE = { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' };
-const flipMove = m => Z2_FACE[m[0]] + m.slice(1);          // user grip <-> cube frame (its own inverse)
+// user grip <-> cube frame (its own inverse). Turning the cube over (z2) swaps top/bottom and left/right,
+// so M (turns like L) and E (like D) change direction; S (like F) doesn't.
+const flipMove = m => 'ME'.includes(m[0]) ? invertMove(m) : m[0] === 'S' ? m : Z2_FACE[m[0]] + m.slice(1);
 const userView = st => rotateState(st, 'z2');
-const B_STAGES = ['White flower', 'White cross', 'White corners', 'Middle layer', 'Yellow cross', 'Yellow edges', 'Place yellow corners', 'Twist yellow corners'];
+const B_STAGES_CLASSIC = ['White flower', 'White cross', 'White corners', 'Middle layer', 'Yellow cross', 'Yellow edges', 'Place yellow corners', 'Twist yellow corners'];
+const B_STAGES_FISH = ['White flower', 'White cross', 'White corners', 'Middle layer', 'Yellow cross', 'Yellow face (fish)', 'Yellow corners', 'Yellow edges'];
+// Last layer: 'fish' (official Rubik's guide: Sune with the fish, headlights, U-perm) or 'classic' (twist corners).
+let begLL = 'fish';
+try { begLL = localStorage.getItem('micube.ll') || 'fish'; } catch (e) { /* ignore */ }
+const bStages = () => begLL === 'fish' ? B_STAGES_FISH : B_STAGES_CLASSIC;
+const APERM = "R' F R' B2 R F' R' B2 R2";     // headlights at the back: cycles three corners
+const UPERM = "F2 U L R' F2 L' R U F2";       // a solved edge at the back: cycles three edges
+// The middle-layer U-perms people learn: "M2 U M U2 M' U M2" and the other direction. For planning the
+// face-turn equivalents are used (same effect on the cube, checked): M2 U' M U2 M' U' M2 = F2 U L R' F2 L' R U F2.
+const UPERM_M = { a: "M2 U M U2 M' U M2", b: "M2 U' M U2 M' U' M2" };
+const UPERM_FACE = { a: "F2 U' R' L F2 R L' U' F2", b: UPERM };
 
 /* Fast facelet permutations for searching (derived from the same geometry the 3D view uses). */
 const PERM = {};
@@ -1450,7 +1488,7 @@ const TWIST = "R' D' R D";
 const LEFTY = X => `${LEFT_OF[X]}' U' ${LEFT_OF[X]} U`;
 const TWIST_W = "L D L' D'";
 /** Turn yellow-up notation into white-up notation (and back): top<->bottom, right<->left. */
-const flipAlgText = t => t.replace(/[URFDLB]/g, f => Z2_FACE[f]);
+const flipAlgText = t => t.replace(/([URFDLBMES])(['2]?)/g, (_, f, suf) => flipMove(f + suf));
 const rep = (alg, n) => Array(n).fill(alg).join(' ');
 const shortest = cands => cands.sort((a, b) => splitAlg(a.alg).length - splitAlg(b.alg).length)[0];
 
@@ -1496,7 +1534,7 @@ function twistPlan(st, grip) {
 }
 
 /** Work out which beginner step the cube is at and the moves for it (in the user's grip). */
-function beginnerPlan(cubeState, grip = 'yellow') {
+function beginnerPlan(cubeState, grip = 'yellow', ll = begLL) {
   const st = userView(cubeState);
   const W = grip === 'white';
   const T = (yellow, white) => W ? white : yellow;
@@ -1570,6 +1608,7 @@ function beginnerPlan(cubeState, grip = 'yellow') {
       text: T(`You have ${shape} of yellow on top. Turn the top as shown, then do the algorithm.`,
         `You have ${shape} of yellow on the bottom. Turn the bottom as shown, then do the algorithm.`) };
   }
+  if (ll === 'fish') return fishPlan(st, T);
   if (edgesMatched(st) < 4) {
     const cands = [];
     for (let j = 1; j < 4; j++) cands.push(UK[j]);
@@ -1596,6 +1635,71 @@ function beginnerPlan(cubeState, grip = 'yellow') {
   return { stage: 8, title: 'Step 8 · Twist yellow corners', moves: twistPlan(st, grip) || [], alg: `${W ? TWIST_W : TWIST}  (repeat)`,
     text: T('Repeat R\' D\' R D until the front-right top corner has yellow on top, then turn only the top (U) to bring the next corner there. Don\'t rotate the cube! The bottom looks scrambled until the very end — that\'s normal.',
       'Repeat R U R\' U\' until the front-right bottom corner has yellow facing down, then turn only the bottom (D) to bring the next corner there. Don\'t rotate the cube! The white side looks scrambled until the very end — that\'s normal.') };
+}
+
+/* Fish last layer (yellow-up frame). Step 6: yellow face with the Sune, step 7: corners with the
+ * headlights algorithm, step 8: edges with the U-perm (and a final top turn). */
+const topYellow = st => [0, 1, 2, 3, 5, 6, 7, 8].every(i => st[i] === 'U');
+const cornersOkAUF = st => AUF.some(a => { const t = a ? falg(st, a) : st; return U_CORNERS.every(c => pieceSolved(t, c)); });
+function fishPlan(st, T) {
+  if (!topYellow(st)) {
+    const oriented = [0, 2, 6, 8].filter(i => st[i] === 'U');
+    let first = null;
+    if (oriented.length === 1) {
+      // the fish: its yellow corner goes to the front-left (it bites your left thumb), then the Sune
+      const k = [0, 1, 2, 3].find(n => falg(st, UK[n])[6] === 'U');
+      first = normAlg(`${UK[k]} ${SUNE}`);
+    } else {
+      // no fish yet: pick the angle that gets the yellow face done with the fewest Sunes
+      for (let d = 1; d <= 3 && !first; d++) {
+        const walk = (t, depth, path) => {
+          if (depth === 0) return twoLayers(t) && topYellow(t) ? path : null;
+          for (let k = 0; k < 4; k++) {
+            const seg = normAlg(`${UK[k]} ${SUNE}`);
+            const r = walk(falg(t, seg), depth - 1, path.concat(seg));
+            if (r) return r;
+          }
+          return null;
+        };
+        const r = walk(st, d, []);
+        if (r) first = r[0];
+      }
+      first = first || SUNE;
+    }
+    const k = UK.indexOf(splitAlg(first)[0]);
+    const text = oriented.length === 1
+      ? T('You have the fish 🐟 (one yellow corner on top). Turn the top so the fish\'s yellow corner is at the front-left — the fish bites your left thumb — then do the Sune. Repeat until the whole top is yellow.',
+          'You have the fish 🐟 (one yellow corner on the bottom). Turn the bottom so the fish bites your left thumb as shown, then do the algorithm. Repeat until the whole yellow side is done.')
+      : T(`${oriented.length === 0 ? 'No' : 'Two'} yellow corners on top yet. Turn the top as shown and do the Sune — that makes the fish.`,
+          `${oriented.length === 0 ? 'No' : 'Two'} yellow corners on the bottom yet. Turn the bottom as shown and do the algorithm — that makes the fish.`);
+    return { stage: 6, title: 'Step 6 · Yellow face (fish)', moves: splitAlg(first), alg: `${k > 0 ? UK[k] + ' then ' : ''}${SUNE}`, text };
+  }
+  if (!cornersOkAUF(st)) {
+    const cands = [];
+    for (let k = 0; k < 4; k++) for (const r of [1, 2]) {
+      const alg = normAlg(`${UK[k]} ${rep(APERM, r)}`), t = falg(st, alg);
+      if (twoLayers(t) && topYellow(t) && cornersOkAUF(t)) cands.push({ alg, k, r });
+    }
+    const best = shortest(cands) || { alg: APERM, k: 0, r: 1 };
+    return { stage: 7, title: 'Step 7 · Yellow corners (headlights)', moves: splitAlg(best.alg),
+      alg: `${best.k ? UK[best.k] + ' then ' : ''}${APERM}${best.r === 2 ? '  (twice)' : ''}`,
+      text: T('Look for “headlights”: two top corners on one side with the same colour. Turn the top so they\'re at the back, then do the algorithm. No headlights? Do it once from any side and they\'ll appear.',
+        'Look for “headlights”: two bottom corners on one side with the same colour. Turn the bottom so they\'re at the back, then do the algorithm. No headlights? Do it once from any side and they\'ll appear.') };
+  }
+  const cands = [];
+  for (let j = 1; j < 4; j++) if (falg(st, UK[j]) === SOLVED) cands.push({ face: UK[j], show: UK[j], k: 0, dir: null });
+  for (let k = 0; k < 4; k++) for (const dir of ['a', 'b']) for (let j = 0; j < 4; j++) {
+    if (falg(st, normAlg(`${UK[k]} ${UPERM_FACE[dir]} ${UK[j]}`)) === SOLVED)
+      cands.push({ face: normAlg(`${UK[k]} ${UPERM_FACE[dir]} ${UK[j]}`), show: normAlg(`${UK[k]} ${UPERM_M[dir]} ${UK[j]}`), k, dir });
+  }
+  if (!cands.length) for (let k = 0; k < 4; k++) cands.push({ show: normAlg(`${UK[k]} ${UPERM_M.a}`), k, dir: 'a' });   // no edge solved yet
+  const best = cands.sort((x, y) => splitAlg(x.show).length - splitAlg(y.show).length)[0];
+  return { stage: 8, title: 'Step 8 · Yellow edges', moves: splitAlg(best.show),
+    alg: best.dir ? `${best.k ? UK[best.k] + ' then ' : ''}${UPERM_M[best.dir]}` : 'just turn the top',
+    text: best.dir
+      ? T('Turn the top so the side whose edge already matches is at the back, then do the U-perm with the middle layer (M turns like L). Finish with a top turn.',
+          'Turn the bottom so the side whose edge already matches is at the back, then do the U-perm with the middle layer. Finish with a bottom turn.')
+      : T('Almost there — just turn the top to finish!', 'Almost there — just turn the bottom to finish!') };
 }
 
 let begGrip = 'white';   // after the white flower: 'white' (white on top) or 'yellow' (yellow on top throughout)
@@ -2187,7 +2291,7 @@ const BOT_LEVELS = {
 let botTimers = [];
 const botLater = (fn, ms) => botTimers.push(setTimeout(fn, ms));
 function botStop() { botTimers.forEach(clearTimeout); botTimers = []; }
-function botState(s, m) { vsOnData({ t: 'state', s, m: m ? [m] : null }); }
+function botState(s, m) { vsOnData({ t: 'state', s, m: Array.isArray(m) ? m : m ? [m] : null }); }
 
 function vsStartBot() {
   const level = BOT_LEVELS[$('vsBotLevel').value] || BOT_LEVELS.improving;
@@ -2214,23 +2318,32 @@ function botReceive(m) {
     botStop();
     const start = vs.oppState;
     // the bot's solution: the beginner method, step by step (cube frame)
-    const seq = [], stepEnds = [];
+    const seq = [], stepEnds = [];   // seq: { s: state after the turn, f: face turns the cube reports }
     let g = start;
     for (let guard = 0; g !== SOLVED && guard < 80; guard++) {
       const pl = beginnerPlan(g, 'yellow');
       if (!pl.moves.length) break;
       const cm = pl.moves.map(flipMove);
-      seq.push(...cm); stepEnds.push(seq.length);
-      g = applyMoves(g, cm.join(' '));
+      let prev = g;
+      for (let k = 0; k < cm.length; k++) {
+        const next = 'MES'.includes(cm[k][0]) || cm.slice(0, k).some(m => 'MES'.includes(m[0])) ? applyFixed(g, cm.slice(0, k + 1)) : applyMoves(prev, cm[k]);
+        seq.push({ s: next, f: 'MES'.includes(cm[k][0]) ? findMoves(prev, next) : null });
+        prev = next;
+      }
+      stepEnds.push(seq.length);
+      g = prev;
     }
     const total = vs.bot.time * 1000 * (0.85 + Math.random() * 0.3);      // ±15% around the level's time
     const pause = total * 0.25 / Math.max(1, stepEnds.length);
     const gap = total * 0.75 / Math.max(1, seq.length);
     let t = 3000 + pause, st = start;                                      // 3 s countdown, then "inspect"
     const t0 = performance.now() + 3000;
-    seq.forEach((mv, i) => {
+    seq.forEach((step, i) => {
       t += gap * (0.6 + Math.random() * 0.8);
-      botLater(() => { st = applyMoves(st, mv); botState(st, mv); }, t);
+      botLater(() => {
+        const faces = step.f || findMoves(st, step.s);       // the cube shows M as R + L'
+        st = step.s; botState(st, faces);
+      }, t);
       if (stepEnds.includes(i + 1)) t += pause * (0.5 + Math.random());
     });
     botLater(() => vsOnData({ t: 'done', time: Math.round(performance.now() - t0) }), t + 50);
@@ -3047,6 +3160,11 @@ $('btnDisconnect').onclick = () => {
   try { localStorage.removeItem(LAST_DEVICE_KEY); } catch (e) { /* ignore */ }   // don't auto-connect next time
 };
 $('btnSolve').onclick = () => guideMethod === 'beginner' ? beginnerStep() : solveNow();
+$('bLL').onchange = e => {
+  begLL = e.target.value;
+  try { localStorage.setItem('micube.ll', begLL); } catch (err) { /* ignore */ }
+  if (guideMethod === 'beginner' && current !== SOLVED && bPlan) beginnerStep(); else renderGuide();
+};
 $('bGrip').onchange = e => {
   begGrip = e.target.value;
   try { localStorage.setItem('micube.grip', begGrip); } catch (err) { /* ignore */ }

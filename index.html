@@ -720,6 +720,9 @@
         <button data-lm="beginner">Beginner method</button><button data-lm="cfop">CFOP (speedcubing)</button>
       </div>
       <p class="msg" id="learnIntro" style="margin-top:0"></p>
+      <label class="chk" id="learnGripWrap" style="margin:-4px 0 10px">After the flower, hold
+        <select id="learnGrip"><option value="white">white on top</option><option value="yellow">yellow on top</option></select>
+        <span class="msg" style="margin:0">(same setting as the Guide tab)</span></label>
       <div class="learn-steps" id="learnSteps"></div>
       <div class="learn-body">
         <div class="learn-main">
@@ -4697,7 +4700,7 @@ function learnMethods() {
   const Y = 'z2';
   const ll = (name, alg, sub, pre, col, state) => ({ name, alg, sub, state: state || learnSetup(Y, alg, pre), view: 'top', col: col || null });
   const ollCol = 'yellow';
-  return {
+  const M = {
     beginner: {
       intro: 'The easiest way to solve the cube: 8 steps, a handful of short algorithms. The Guide tab coaches you live through the same steps on your smart cube.',
       steps: [
@@ -4811,6 +4814,41 @@ function learnMethods() {
             ll('H', "M2 U M2 U2 M2 U M2", 'opposites swap'), ll('Z', "M' U M2 U M2 U M' U2 M2", 'neighbours swap')] },
       ] },
   };
+  if (wg) whiteOnTopLL(M.beginner.steps);
+  return M;
+}
+
+/* With white on top for the whole solve, the last layer is on the bottom: same cases turned over (z2),
+ * algorithms written for that grip, pictures of the yellow side seen from below. */
+function whiteOnTopLL(steps) {
+  const turn = x => ({ ...x, s: x.s && applyMoves(x.s, 'z2'), state: x.state && applyMoves(x.state, 'z2'), alg: x.alg && flipAlgText(x.alg), view: 'bottom', bottom: true });
+  const TXT = [
+    ['Look at the <b>bottom</b> (the yellow side): a dot, an “L”, a line, or already a cross (ignore the corners). The pictures show it seen from below — the front edge is at the top of the picture.',
+      'Line: hold it <b>left-to-right</b>. L: hold it at the <b>back-right</b>. Then do the algorithm.',
+      'Dot: just do the algorithm — you get an L, then a line, then the cross.'],
+    ['Count the yellow corners on the bottom (yellow facing down).',
+      '<b>One (the fish 🐟)</b>: turn the bottom so the fish\'s yellow corner is at the <b>front-right</b> — with white on top the fish bites your <b>right</b> thumb — and do the algorithm.',
+      '<b>None</b>: turn the bottom until a yellow sticker on the <b>right side</b> sits at the front-right, then do the algorithm. You get the fish.',
+      '<b>Two</b>: turn the bottom until a yellow sticker on the <b>front</b> sits at the front-right, then do the algorithm. You get the fish.',
+      'Repeat with the fish until the whole bottom is yellow.'],
+    ['Look for “headlights”: two bottom corners on one side with the same colour.',
+      'Turn the bottom so the headlights are at the <b>back</b>, then do the algorithm.',
+      'No headlights anywhere? Do it once from any side — then you\'ll have them.'],
+    ['Find a side whose bottom edge already matches its corners, and turn the bottom to put that side at the <b>back</b>.',
+      'Pick the U-perm for the way the front edge has to go. (M turns the middle layer like L.)',
+      'No matching side? Do either U-perm once, then you have one. Finish with a bottom turn if needed.'],
+  ];
+  const SUBS = { 'bites your left thumb': 'bites your right thumb', 'yellow on the left side → fish': 'yellow on the right side → fish', 'yellow on the front → fish': 'yellow on the front → fish',
+    'at the back-left → line': 'at the back-right → line' };
+  const NAMES = { 'U-perm (edges go left)': 'U-perm (edges go right)', 'U-perm (edges go right)': 'U-perm (edges go left)' };
+  for (let k = 0; k < 4; k++) {
+    const st = steps[4 + k];
+    st.hold = 'White on top';
+    st.tip = k === 0 ? 'Keep white on top: the last layer is solved on the <b>bottom</b>. Tip: look at the demo cube from below, or lift your cube to check the yellow side.' : '';
+    st.text = TXT[k];
+    st.goal = st.goal.map(g => ({ ...turn(g), cap: g.cap.replace('on top', 'on the bottom').replace('Whole top', 'Whole bottom').replace('Top corners', 'Bottom corners') + ' — seen from below, front edge at the top' }));
+    st.algs = st.algs.map(a => ({ ...turn(a), name: NAMES[a.name] || a.name, sub: SUBS[a.sub] || a.sub }));
+  }
 }
 
 const learn = { method: 'beginner', step: 0, seen: {}, view: null, demo: null };
@@ -4823,6 +4861,10 @@ function learnColour(kind, s) {
   return undefined;
 }
 function learnPic(x) {
+  if (x.bottom) {
+    const v = applyMoves(x.s || x.state, 'x2');
+    return learnPic({ ...x, s: v, state: v, bottom: false, view: 'top', top: true });
+  }
   if (x.top || x.view === 'top') {
     if (x.keep && !x.col) { const m = learnMask(x.keep); return topPic(x.s || x.state, i => m(x.s || x.state, i) ? `var(--c${(x.s || x.state)[i]})` : LEARN_GREY); }
     return topPic(x.s || x.state, learnColour(x.col, x.s || x.state));
@@ -4837,6 +4879,8 @@ function renderLearn() {
   (learn.seen[method] = learn.seen[method] || {})[learn.step] = 1; saveLearn();
   document.querySelectorAll('#learnMethod button').forEach(b => b.classList.toggle('active', b.dataset.lm === method));
   $('learnIntro').textContent = data.intro;
+  $('learnGripWrap').classList.toggle('hidden', method !== 'beginner');
+  $('learnGrip').value = begGrip;
   $('learnSteps').innerHTML = data.steps.map((x, i) => `<button data-ls="${i}" class="${i === learn.step ? 'on' : ''} ${learn.seen[method][i] ? 'seen' : ''}">${i + 1}. ${x.title}</button>`).join('');
   $('learnTitle').textContent = `Step ${learn.step + 1} · ${st.title}`;
   $('learnHold').textContent = '✋ ' + st.hold + (st.hold.includes('top') && !st.hold.includes('green') ? ', green in front' : '');
@@ -4863,6 +4907,7 @@ function learnView() {
   scene.addEventListener('pointermove', e => { if (!drag) return; ry = drag.ry + (e.clientX - drag.x) * 0.6; rx = Math.max(-89, Math.min(89, drag.rx - (e.clientY - drag.y) * 0.6)); apply(); });
   const end = () => { drag = null; };
   scene.addEventListener('pointerup', end); scene.addEventListener('pointercancel', end);
+  v.tilt = up => { rx = up ? 30 : -28; apply(); };
   learn.view = v;
   return v;
 }
@@ -4872,7 +4917,7 @@ function learnLoad(a, idx, step) {
   document.querySelectorAll('.learn-alg').forEach(el => el.classList.toggle('on', Number(el.dataset.la) === idx && !!a));
   if (!a) {   // no algorithm in this step: show the goal
     const g = step.goal[0];
-    v.mask = learnMask(g.keep); v.paint(g.s);
+    v.mask = learnMask(g.keep); v.tilt(!!g.bottom); v.paint(g.s);
     learn.demo = null;
     $('learnDemoName').textContent = 'Goal of this step'; $('learnDemoAlg').innerHTML = '';
     for (const id of ['learnPlay', 'learnBack', 'learnFwd', 'learnRestart']) $(id).disabled = true;
@@ -4882,7 +4927,8 @@ function learnLoad(a, idx, step) {
   const moves = splitAlg(a.alg), states = [a.state];
   for (const m of moves) states.push(applyMoves(states[states.length - 1], m));
   learn.demo = { a, moves, states, i: 0, playing: false, timer: 0 };
-  v.mask = a.view === 'top' ? null : learnMask(a.keep);
+  v.mask = a.view === 'top' || a.view === 'bottom' ? null : learnMask(a.keep);
+  v.tilt(a.view === 'bottom');
   v.paint(a.state);
   $('learnDemoName').textContent = a.name;
   learnDemoText();
@@ -4930,6 +4976,7 @@ $('learnAlgs').addEventListener('click', e => {
     learnPlay();
   }
 });
+$('learnGrip').onchange = e => { $('bGrip').value = e.target.value; $('bGrip').onchange({ target: $('bGrip') }); renderLearn(); };
 $('learnPlay').onclick = learnPlay;
 $('learnRestart').onclick = () => { learnStop(); learnGo(0); };
 $('learnBack').onclick = () => { learnStop(); if (learn.demo) learnGo(learn.demo.i - 1); };

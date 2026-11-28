@@ -347,6 +347,44 @@
   #featureText, #featureContact { width: 100%; font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
     border-radius: 10px; padding: 10px; margin-top: 8px; resize: vertical; }
   @media (max-width: 700px) { .site-foot { padding-bottom: calc(86px + env(safe-area-inset-bottom)); justify-content: center; } }
+  /* Learn tab */
+  .learn-steps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .learn-steps button { font-size: 13px; padding: 5px 10px; border-radius: 999px; }
+  .learn-steps button.on { background: var(--accent); color: #fff; border-color: transparent; }
+  .learn-steps button.seen:not(.on) { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
+  .learn-body { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 18px; align-items: start; }
+  .learn-title { margin: 0 0 4px; font-size: 20px; letter-spacing: 0; }
+  .learn-hold { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+  .learn-goal { display: flex; flex-wrap: wrap; gap: 14px; margin: 4px 0 6px; }
+  .learn-goal figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .learn-goal figcaption { font-size: 12px; color: var(--muted); text-align: center; max-width: 130px; }
+  .learn-goal svg { width: 110px; height: 120px; }
+  .learn-goal .diag { width: 104px; height: 104px; margin: 8px 0; }
+  .learn-text { margin: 6px 0 12px; padding-left: 20px; line-height: 1.55; }
+  .learn-text li { margin: 4px 0; }
+  .learn-algs { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .learn-alg { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; gap: 10px; align-items: center; }
+  .learn-alg.on { border-color: var(--accent); }
+  .learn-alg svg { width: 64px; height: 70px; flex: none; }
+  .learn-alg .diag { width: 64px; height: 64px; }
+  .learn-alg .nm { font-weight: 700; font-size: 14px; }
+  .learn-alg .sm { font-size: 12px; color: var(--muted); margin: 2px 0 4px; }
+  .learn-alg code { font: 600 13px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; display: block; }
+  .learn-alg button { margin-top: 6px; padding: 3px 10px; font-size: 13px; }
+  .learn-demo { position: sticky; top: 80px; background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 10px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .learn-scene { --s: .95; }
+  .learn-demo-name { font-weight: 700; text-align: center; font-size: 14px; }
+  .learn-demo-alg { font: 600 15px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; text-align: center; min-height: 24px; }
+  .learn-demo-alg span { padding: 1px 3px; border-radius: 5px; }
+  .learn-demo-alg span.done { color: var(--muted); }
+  .learn-demo-alg span.now { background: var(--accent); color: #fff; }
+  .learn-ctl { justify-content: center; gap: 6px; }
+  .learn-ctl button { padding: 5px 10px; }
+  .learn-nav { justify-content: space-between; margin-top: 14px; }
+  .learn-tip { font-size: 13px; color: var(--muted); background: var(--panel2); border-left: 3px solid var(--accent); border-radius: 8px; padding: 8px 10px; margin: 0 0 12px; }
+  @media (max-width: 1100px) { .learn-body { grid-template-columns: 1fr; } .learn-demo { position: static; } }
   /* settings dialog */
   dialog.sheet { border: 1px solid var(--line); border-radius: 18px; padding: 0; background: var(--bg); color: var(--text);
     width: min(560px, calc(100vw - 24px)); max-height: calc(100vh - 40px); box-shadow: var(--shadow); }
@@ -538,6 +576,7 @@
   <section>
     <div class="tabs">
       <button data-tab="guide" class="active"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/></svg>Guide</button>
+      <button data-tab="learn"><svg viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5A2.5 2.5 0 0 0 6.5 23H20v-5"/><path d="M8 7h8M8 11h6"/></svg>Learn</button>
       <button data-tab="turns"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>Turns</button>
       <button data-tab="timer"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>Timer</button>
       <button data-tab="train"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Algorithms</button>
@@ -676,6 +715,38 @@
     </div>
 
     <!-- Turns: learn the move notation by doing it on the cube -->
+    <div id="tab-learn" class="hidden">
+      <div class="seg" id="learnMethod" style="margin-bottom:10px">
+        <button data-lm="beginner">Beginner method</button><button data-lm="cfop">CFOP (speedcubing)</button>
+      </div>
+      <p class="msg" id="learnIntro" style="margin-top:0"></p>
+      <div class="learn-steps" id="learnSteps"></div>
+      <div class="learn-body">
+        <div class="learn-main">
+          <h3 class="learn-title" id="learnTitle"></h3>
+          <div class="learn-hold" id="learnHold"></div>
+          <div class="learn-goal" id="learnGoal"></div>
+          <ol class="learn-text" id="learnText"></ol>
+          <div class="learn-algs" id="learnAlgs"></div>
+        </div>
+        <div class="learn-demo" id="learnDemo">
+          <div class="scene learn-scene" id="learnScene"><div class="cube3d" id="learnCube"></div></div>
+          <div class="learn-demo-name" id="learnDemoName">Pick ▶ on an algorithm to watch it</div>
+          <div class="learn-demo-alg" id="learnDemoAlg"></div>
+          <div class="row learn-ctl">
+            <button id="learnRestart" title="Start again" aria-label="Start again">⏮</button>
+            <button id="learnBack" title="One move back" aria-label="One move back">◀</button>
+            <button class="primary" id="learnPlay">▶ Play</button>
+            <button id="learnFwd" title="One move forward" aria-label="One move forward">▶❘</button>
+          </div>
+          <div class="hint">Drag the cube to look around it.</div>
+        </div>
+      </div>
+      <div class="row learn-nav">
+        <button id="learnPrev">← Previous step</button>
+        <button class="primary" id="learnNext">Next step →</button>
+      </div>
+    </div>
     <div id="tab-turns" class="hidden">
       <div class="opts" style="margin-top:0">
         <label class="chk"><input type="checkbox" data-lvl="basic" checked> R L U D F B</label>
@@ -1416,7 +1487,9 @@ class CubeView {
       this.st[fi * 9 + i] = sticker;
     }
   }
-  paintNow(state) { for (let i = 0; i < 54; i++) this.st[i].style.backgroundColor = `var(--c${state[i]})`; }
+  paintNow(state) {
+    for (let i = 0; i < 54; i++) this.st[i].style.backgroundColor = this.mask && !this.mask(state, i) ? LEARN_GREY : `var(--c${state[i]})`;
+  }
   /** Show a state at once (stops any animation). */
   paint(state) { this.stop(); this.target = state; this.paintNow(state); }
   /** A solid black square closing off the inside of the cube at a layer boundary. */
@@ -3942,9 +4015,12 @@ function setMode(m) {
   $('tab-train').classList.toggle('hidden', m !== 'train');
   $('tab-vs').classList.toggle('hidden', m !== 'vs');
   $('tab-turns').classList.toggle('hidden', m !== 'turns');
+  $('tab-learn').classList.toggle('hidden', m !== 'learn');
   if (m !== 'turns' && tu.on) { tu.on = false; clearTimeout(tu.timer); }
   try { localStorage.setItem('micube.tab', m); } catch (e) { /* ignore */ }
   if (m !== 'train' && train.phase !== 'off') stopTraining();
+  if (m !== 'learn') learnStop();
+  if (m === 'learn') renderLearn();
   if (m === 'turns') {
     if (timer.phase === 'running' || timer.phase === 'ready') cancelRun();
     tuRender();
@@ -4576,6 +4652,295 @@ $('misReplay').onclick = replayMistake;
 $('misClose').onclick = hideMistake;
 $('xNew').onclick = crossNew;
 
+/* ----------------------------- Learn: step-by-step method guides ---------
+ * Every picture and demo is made by undoing the algorithm from a solved cube, so what you see
+ * is exactly the case the algorithm solves. States are in the holder's view: with yellow on top
+ * the cube is turned over (z2) and the colours stay true. */
+const LEARN_GREY = '#4a5060';
+const PIECE_OF = (() => { const m = []; for (const p of [...CORNERS, ...EDGES]) { const ids = p.map(x => x.i); for (const i of ids) m[i] = ids; } return m; })();
+const pieceLetters = (s, i) => PIECE_OF[i] ? PIECE_OF[i].map(j => s[j]).join('') : null;
+/** keep(letters, isEdge) decides which pieces are coloured; centres always are. */
+const learnMask = keep => keep ? (s, i) => { const l = pieceLetters(s, i); return l === null || keep(l, l.length === 2); } : null;
+const heldSolved = hold => hold ? applyMoves(SOLVED, hold) : SOLVED;
+/** The state that `alg` turns into `after` (default: solved). `pre` = the moves that undo `after`. */
+const learnSetup = (hold, alg, pre) => applyMoves(heldSolved(hold), ((pre || '') + ' ' + invertAlg(alg)).trim());
+const repAlg = (a, n) => Array(n).fill(a).join(' ');
+const isoPic = (s, keep) => { const m = learnMask(keep); return isoSVG(s, i => m && !m(s, i) ? LEARN_GREY : `var(--c${s[i]})`); };
+/** Top view (top face plus the top row of each side), like the trainer's case pictures. */
+function topPic(s, col = i => `var(--c${s[i]})`) {
+  const layout = [null, 47, 46, 45, null, 36, 0, 1, 2, 11, 37, 3, 4, 5, 10, 38, 6, 7, 8, 9, null, 18, 19, 20, null];
+  return `<div class="diag">${layout.map(i => i === null ? '<div></div>' : `<div style="background:${col(i)}"></div>`).join('')}</div>`;
+}
+const yellowOnly = s => i => s[i] === 'D' ? 'var(--cD)' : LEARN_GREY;
+const notYellowPieces = l => !l.includes('D');           // the first two layers
+const whitePieces = l => l.includes('U');
+const whiteEdges = (l, edge) => edge && l.includes('U');
+
+const SUNE_ALG = "R U R' U R U2 R'", APERM_ALG = "R' F R' B2 R F' R' B2 R2", EO_ALG = "F R U R' U' F'";
+const begHold = () => begGrip === 'white' ? '' : 'z2';
+function learnMethods() {
+  const wg = begGrip === 'white';
+  const H = begHold();
+  const cornerAlg = wg ? "R' D' R D" : "R U R' U'";
+  const cornerWhere = s => wg ? (s[29] === 'U' ? 'down' : s[15] === 'U' ? 'right' : 'front') : (s[8] === 'U' ? 'up' : s[9] === 'U' ? 'right' : 'front');
+  const corners = [1, 3, 5].map(n => {
+    const alg = repAlg(cornerAlg, n), st = learnSetup(H, alg);
+    return { name: `White facing ${cornerWhere(st)}`, sub: `${cornerAlg} × ${n}`, alg, state: st, keep: whitePieces, view: 'iso' };
+  });
+  const midR = "U R U' R' U' F' U F", midL = "U' L' U L U F U' F'";
+  const mids = [[midR, 'right'], [midL, 'left']].map(([a, dir]) => {
+    const alg = wg ? flipAlgText(a) : a, goes = wg ? (dir === 'right' ? 'left' : 'right') : dir;
+    return { name: `Edge goes to the ${goes}`, sub: '', alg, state: learnSetup(H, alg), keep: notYellowPieces, view: 'iso' };
+  });
+  const daisy = applyMoves(applyMoves(SOLVED, 'F2 R2 B2 L2'), 'z2');
+  const fromDaisy = alg => applyMoves(daisy, invertAlg(alg));
+  const Y = 'z2';
+  const ll = (name, alg, sub, pre, col, state) => ({ name, alg, sub, state: state || learnSetup(Y, alg, pre), view: 'top', col: col || null });
+  const ollCol = 'yellow';
+  return {
+    beginner: {
+      intro: 'The easiest way to solve the cube: 8 steps, a handful of short algorithms. The Guide tab coaches you live through the same steps on your smart cube.',
+      steps: [
+        { title: 'White flower (daisy)', hold: 'Yellow on top',
+          goal: [{ s: daisy, keep: whiteEdges, cap: 'Four white edges around the yellow centre' }],
+          text: ['Hold the cube with the <b>yellow centre on top</b>.',
+            'Find an edge piece with white on it and bring it up next to the yellow centre, <b>white sticker facing up</b>. These are the “petals”.',
+            'Before you bring a petal up, turn the top (U) so the spot it will go to is free — otherwise you knock out a petal you already have.',
+            'A white edge in the middle layer comes up with one turn of its side. One at the bottom with white facing down needs two turns (like F2).',
+            'An edge with white facing sideways: turn its side once to move it into the middle layer, then bring it up.'],
+          algs: [{ name: 'From the middle layer', sub: 'one turn brings it up', alg: 'R', state: fromDaisy('R'), keep: whiteEdges, view: 'iso' },
+            { name: 'From the bottom', sub: 'white facing down', alg: 'F2', state: fromDaisy('F2'), keep: whiteEdges, view: 'iso' }] },
+        { title: 'White cross', hold: 'Yellow on top, then turn white up',
+          goal: [{ s: SOLVED, keep: whiteEdges, cap: 'White cross, each edge matching its side centre (shown white on top)' }],
+          text: ['Keep yellow on top. Turn the top until a petal\'s side colour matches the centre right below it (green above green).',
+            'Turn that side twice (F2): the white edge drops to the bottom, in the right place.',
+            'Do the same for the other three petals.',
+            wg ? 'Now turn the whole cube over: <b>white on top</b>. That\'s how you hold it for steps 3 and 4.' : 'Keep yellow on top: the white cross is now on the bottom.'],
+          algs: [{ name: 'Matched petal', sub: 'drop it down', alg: 'F2', state: daisy, keep: whiteEdges, view: 'iso' },
+            { name: 'All four matched', sub: 'all petals down', alg: 'F2 R2 B2 L2', state: daisy, keep: whiteEdges, view: 'iso' }] },
+        { title: 'White corners', hold: wg ? 'White on top' : 'Yellow on top (white on the bottom)',
+          goal: [{ s: SOLVED, keep: whitePieces, cap: 'The whole white side, with matching side colours (shown white on top)' }],
+          text: wg ? ['Find a white corner in the <b>bottom</b> layer.',
+            'Turn the bottom (D) until the corner sits right <b>under</b> its spot — its two side colours match the centres next to that spot.',
+            'Hold that spot at the <b>front-right</b> and repeat <b>R\' D\' R D</b> until the corner is solved (1, 3 or 5 times).',
+            'A white corner stuck on top in the wrong place or twisted? Do R\' D\' R D once to bring it down, then solve it as above.']
+            : ['Find a white corner in the <b>top</b> layer.',
+              'Turn the top (U) until the corner sits right <b>above</b> its spot — its two side colours match the centres next to that spot.',
+              'Hold that spot at the <b>front-right</b> and repeat <b>R U R\' U\'</b> until the corner is solved (1, 3 or 5 times).',
+              'A white corner stuck at the bottom in the wrong place or twisted? Do R U R\' U\' once to bring it up, then solve it as above.'],
+          algs: corners },
+        { title: 'Middle layer', hold: wg ? 'White on top' : 'Yellow on top',
+          goal: [{ s: SOLVED, keep: notYellowPieces, cap: 'First two layers done (shown white on top)' }],
+          text: [`Find an edge in the ${wg ? 'bottom' : 'top'} layer <b>without yellow</b>.`,
+            `Turn the ${wg ? 'bottom' : 'top'} until its front colour matches the front centre (it makes an upside-down “T”).`,
+            'Look at its other colour: does it belong on the right or on the left? Do that algorithm.',
+            `No edge without yellow left in the ${wg ? 'bottom' : 'top'}, but one is wrong in the middle? Do either algorithm once to take it out.`],
+          algs: mids },
+        { title: 'Yellow cross', hold: 'Yellow on top',
+          tip: wg ? 'Turn the cube over for the last layer: yellow on top. (Your Guide tab is set to keep white on top; it shows these same moves mirrored.)' : '',
+          goal: [{ s: heldSolved(Y), keep: (l, e) => true, cap: 'Yellow cross on top', top: true, col: 'yellow-edges' }],
+          text: ['Look at the top: a dot, an “L”, a line, or already a cross (ignore the corners).',
+            'Line: hold it <b>left-to-right</b>. L: hold it at the <b>back-left</b> (like 9 and 12 o\'clock). Then do the algorithm.',
+            'Dot: just do the algorithm — you get an L, then a line, then the cross.'],
+          algs: [ll('Line', EO_ALG, 'hold it left-to-right', '', 'yellow-edges'), ll('L shape', EO_ALG, 'at the back-left → line', invertAlg(EO_ALG), 'yellow-edges'),
+            ll('Dot', EO_ALG, '→ L shape', invertAlg(EO_ALG + ' ' + EO_ALG), 'yellow-edges')] },
+        { title: 'Yellow face (the fish)', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), cap: 'Whole top yellow', top: true, col: ollCol }],
+          text: ['Count the yellow corners on top.',
+            '<b>One (the fish 🐟)</b>: turn the top so the fish\'s yellow corner is at the front-left — the fish bites your left thumb — and do the Sune.',
+            '<b>None</b>: turn the top until a yellow sticker on the <b>left side</b> sits at the front-left, then do the Sune. You get the fish.',
+            '<b>Two</b>: turn the top until a yellow sticker on the <b>front</b> sits at the front-left, then do the Sune. You get the fish.',
+            'Repeat with the fish until the whole top is yellow.'],
+          algs: [ll('Fish', SUNE_ALG, 'bites your left thumb', '', ollCol),
+            ll('No corners', SUNE_ALG, 'yellow on the left side → fish', '', ollCol, applyMoves(heldSolved(Y), invertAlg("R U2 R2 U' R2 U' R2 U2 R"))),
+            ll('Two corners', SUNE_ALG, 'yellow on the front → fish', '', ollCol, applyMoves(heldSolved(Y), invertAlg("r U R' U' r' F R F'")))] },
+        { title: 'Yellow corners (headlights)', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), keep: (l, e) => !e, cap: 'Top corners in place: every side shows matching corners', top: true }],
+          text: ['Look for “headlights”: two corners on one side with the same colour.',
+            'Turn the top so the headlights are at the <b>back</b>, then do the algorithm.',
+            'No headlights anywhere? Do it once from any side — then you\'ll have them.'],
+          algs: [ll('Headlights at the back', APERM_ALG, 'swaps the other corners'),
+            ll('No headlights', APERM_ALG, 'from any side → headlights', invertAlg(APERM_ALG) + " U'")] },
+        { title: 'Yellow edges', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), cap: 'Solved! 🎉', top: true }],
+          text: ['Find a side whose edge already matches its corners, and turn the top to put that side at the <b>back</b>.',
+            'Front edge must go <b>left</b> or <b>right</b>? Pick that U-perm. (M turns the middle layer like L.)',
+            'No matching side? Do either U-perm once, then you have one. Finish with a top turn if needed.'],
+          algs: [ll('U-perm (edges go left)', "M2 U M U2 M' U M2", 'solved side at the back'),
+            ll('U-perm (edges go right)', "M2 U' M U2 M' U' M2", 'solved side at the back')] },
+      ] },
+    cfop: {
+      intro: 'CFOP is what most speedcubers use: Cross, F2L (first two layers in pairs), OLL and PLL. Start with “2-look” OLL and PLL: only 16 algorithms, and you can learn the full sets later in the Algorithms tab.',
+      steps: [
+        { title: 'Cross', hold: 'White on the bottom, yellow on top',
+          goal: [{ s: heldSolved(Y), keep: whiteEdges, cap: 'Cross pieces in place (sides match)' }, { s: applyMoves(heldSolved(Y), 'x2'), keep: whiteEdges, cap: 'Seen from below' }],
+          text: ['Solve the white cross directly on the <b>bottom</b> — no daisy. Each edge must match its side centre.',
+            'Use the 15 s inspection to plan the whole cross before you start. Good crosses take 8 moves or fewer.',
+            'Practise in Algorithms → Cross: it shows the shortest cross for every scramble.'],
+          algs: [] },
+        { title: 'F2L (first two layers)', hold: 'White on the bottom',
+          goal: [{ s: heldSolved(Y), keep: notYellowPieces, cap: 'First two layers solved' }],
+          text: ['Each white corner and its matching edge go in together as a <b>pair</b> into one of the four slots.',
+            'First join the corner and edge in the top layer, then insert the pair with three or four moves — like the cases below.',
+            'Keep the slot you\'re filling at the <b>front-right</b>. Look ahead for the next pair while you insert.',
+            'There are 41 cases in total — the Algorithms tab has all of them. Learning them intuitively first works best.'],
+          algs: [["Pair above its slot", "R U R'"], ['Pair from the left', "F' U' F"], ['Split pair (right)', "U R U' R'"], ['Split pair (front)', "U' F' U F"]]
+            .map(([name, alg]) => ({ name, alg, sub: '', state: learnSetup(Y, alg), keep: notYellowPieces, view: 'iso' })) },
+        { title: 'OLL (2-look): yellow cross', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), cap: 'Yellow cross', top: true, col: 'yellow-edges' }],
+          text: ['Like the beginner method, but faster: the <b>L shape</b> gets its own algorithm (with a wide f, two layers at once).',
+            'Line: hold it left-to-right. L: hold it at the <b>front-right</b> (yellow edges at the front and right, as in the picture). Dot: do both algorithms, one after the other.'],
+          algs: [ll('Line', EO_ALG, 'left-to-right', '', 'yellow-edges'), ll('L shape', "f R U R' U' f'", 'at the front-right', '', 'yellow-edges'),
+            ll('Dot', "F R U R' U' F' f R U R' U' f'", 'both, one after the other', '', 'yellow-edges')] },
+        { title: 'OLL (2-look): yellow corners', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), cap: 'Whole top yellow', top: true, col: ollCol }],
+          text: ['Seven cases. Turn the top until it looks like a picture below, then do its algorithm.',
+            'Sune and Antisune are the ones you\'ll see most — learn those first.'],
+          algs: [['Sune', SUNE_ALG], ['Antisune', "R U2 R' U' R U' R'"], ['H', "R U R' U R U' R' U R U2 R'"], ['Pi', "R U2 R2 U' R2 U' R2 U2 R"],
+            ['Headlights', "R2 D R' U2 R D' R' U2 R'"], ['Chameleon (T)', "r U R' U' r' F R F'"], ['Bowtie (L)', "F' r U R' U' r' F R"]].map(([n, a]) => ll(n, a, '', '', ollCol)) },
+        { title: 'PLL (2-look): corners', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), keep: (l, e) => !e, cap: 'Corners in place', top: true }],
+          text: ['Look for headlights (two corners on one side with the same colour).',
+            'Headlights: put them at the <b>back</b> and do the A-perm. None: do the Y-perm.'],
+          algs: [ll('Headlights (A-perm)', APERM_ALG, 'headlights at the back'), ll('Diagonal (Y-perm)', "F R U' R' U' R U R' F' R U R' U' R' F R F'", 'no headlights')] },
+        { title: 'PLL (2-look): edges', hold: 'Yellow on top',
+          goal: [{ s: heldSolved(Y), cap: 'Solved! 🎉', top: true }],
+          text: ['Four cases. With a solved side, put it at the <b>back</b> and do Ua or Ub.',
+            'No solved side: H (opposite edges swap) or Z (neighbouring edges swap).'],
+          algs: [ll('Ua', "M2 U M U2 M' U M2", 'solved side at the back'), ll('Ub', "M2 U' M U2 M' U' M2", 'solved side at the back'),
+            ll('H', "M2 U M2 U2 M2 U M2", 'opposites swap'), ll('Z', "M' U M2 U M2 U M' U2 M2", 'neighbours swap')] },
+      ] },
+  };
+}
+
+const learn = { method: 'beginner', step: 0, seen: {}, view: null, demo: null };
+try { Object.assign(learn, JSON.parse(localStorage.getItem('micube.learn.v1') || '{}'), { view: null, demo: null }); } catch (e) { /* ignore */ }
+const saveLearn = () => { try { localStorage.setItem('micube.learn.v1', JSON.stringify({ method: learn.method, step: learn.step, seen: learn.seen })); } catch (e) { /* ignore */ } };
+
+function learnColour(kind, s) {
+  if (kind === 'yellow') return yellowOnly(s);
+  if (kind === 'yellow-edges') return i => [1, 3, 5, 7, 4].includes(i) && s[i] === 'D' ? 'var(--cD)' : LEARN_GREY;
+  return undefined;
+}
+function learnPic(x) {
+  if (x.top || x.view === 'top') {
+    if (x.keep && !x.col) { const m = learnMask(x.keep); return topPic(x.s || x.state, i => m(x.s || x.state, i) ? `var(--c${(x.s || x.state)[i]})` : LEARN_GREY); }
+    return topPic(x.s || x.state, learnColour(x.col, x.s || x.state));
+  }
+  return isoPic(x.s || x.state, x.keep);
+}
+
+function renderLearn() {
+  const M = learnMethods(), method = M[learn.method] ? learn.method : 'beginner', data = M[method];
+  learn.step = Math.max(0, Math.min(learn.step, data.steps.length - 1));
+  const st = data.steps[learn.step];
+  (learn.seen[method] = learn.seen[method] || {})[learn.step] = 1; saveLearn();
+  document.querySelectorAll('#learnMethod button').forEach(b => b.classList.toggle('active', b.dataset.lm === method));
+  $('learnIntro').textContent = data.intro;
+  $('learnSteps').innerHTML = data.steps.map((x, i) => `<button data-ls="${i}" class="${i === learn.step ? 'on' : ''} ${learn.seen[method][i] ? 'seen' : ''}">${i + 1}. ${x.title}</button>`).join('');
+  $('learnTitle').textContent = `Step ${learn.step + 1} · ${st.title}`;
+  $('learnHold').textContent = '✋ ' + st.hold + (st.hold.includes('top') && !st.hold.includes('green') ? ', green in front' : '');
+  $('learnGoal').innerHTML = (st.tip ? `<p class="learn-tip">${st.tip}</p>` : '') +
+    st.goal.map(g => `<figure>${learnPic(g)}<figcaption>${g.cap}</figcaption></figure>`).join('');
+  $('learnText').innerHTML = st.text.map(t => `<li>${t}</li>`).join('');
+  $('learnAlgs').innerHTML = st.algs.map((a, i) => `<div class="learn-alg" data-la="${i}">${learnPic(a)}<div>
+      <div class="nm">${a.name}</div>${a.sub ? `<div class="sm">${a.sub}</div>` : ''}<code>${a.alg}</code>
+      <button data-play="${i}">▶ Watch</button></div></div>`).join('');
+  $('learnPrev').disabled = learn.step === 0;
+  $('learnNext').textContent = learn.step === data.steps.length - 1 ? 'Done ✓' : 'Next step →';
+  learnLoad(st.algs.length ? st.algs[0] : null, 0, st);
+}
+
+/* the demo cube (one, created on first use) */
+function learnView() {
+  if (learn.view) return learn.view;
+  const v = new CubeView($('learnCube'));
+  let rx = -28, ry = -38, drag = null;
+  const scene = $('learnScene');
+  const apply = () => { const sc = parseFloat(getComputedStyle(scene).getPropertyValue('--s')) || 1; $('learnCube').style.transform = `scale(${sc}) rotateX(${rx}deg) rotateY(${ry}deg)`; };
+  apply();
+  scene.addEventListener('pointerdown', e => { drag = { x: e.clientX, y: e.clientY, rx, ry }; scene.setPointerCapture(e.pointerId); });
+  scene.addEventListener('pointermove', e => { if (!drag) return; ry = drag.ry + (e.clientX - drag.x) * 0.6; rx = Math.max(-89, Math.min(89, drag.rx - (e.clientY - drag.y) * 0.6)); apply(); });
+  const end = () => { drag = null; };
+  scene.addEventListener('pointerup', end); scene.addEventListener('pointercancel', end);
+  learn.view = v;
+  return v;
+}
+function learnLoad(a, idx, step) {
+  learnStop();
+  const v = learnView();
+  document.querySelectorAll('.learn-alg').forEach(el => el.classList.toggle('on', Number(el.dataset.la) === idx && !!a));
+  if (!a) {   // no algorithm in this step: show the goal
+    const g = step.goal[0];
+    v.mask = learnMask(g.keep); v.paint(g.s);
+    learn.demo = null;
+    $('learnDemoName').textContent = 'Goal of this step'; $('learnDemoAlg').innerHTML = '';
+    for (const id of ['learnPlay', 'learnBack', 'learnFwd', 'learnRestart']) $(id).disabled = true;
+    return;
+  }
+  for (const id of ['learnPlay', 'learnBack', 'learnFwd', 'learnRestart']) $(id).disabled = false;
+  const moves = splitAlg(a.alg), states = [a.state];
+  for (const m of moves) states.push(applyMoves(states[states.length - 1], m));
+  learn.demo = { a, moves, states, i: 0, playing: false, timer: 0 };
+  v.mask = a.view === 'top' ? null : learnMask(a.keep);
+  v.paint(a.state);
+  $('learnDemoName').textContent = a.name;
+  learnDemoText();
+}
+function learnDemoText() {
+  const d = learn.demo; if (!d) return;
+  $('learnDemoAlg').innerHTML = d.moves.map((m, i) => `<span class="${i < d.i ? 'done' : i === d.i && d.playing ? 'now' : ''}">${m}</span>`).join(' ');
+  $('learnPlay').textContent = d.playing ? '⏸ Pause' : d.i >= d.moves.length ? '↺ Again' : '▶ Play';
+}
+function learnGo(to, animate) {
+  const d = learn.demo; if (!d) return;
+  to = Math.max(0, Math.min(d.moves.length, to));
+  const v = learnView();
+  if (animate && to === d.i + 1) v.show(d.states[to], d.states[d.i], [d.moves[d.i]], true);
+  else v.paint(d.states[to]);
+  d.i = to; learnDemoText();
+}
+function learnPlay() {
+  const d = learn.demo; if (!d) return;
+  if (d.playing) { learnStop(); return; }
+  if (d.i >= d.moves.length) learnGo(0);
+  d.playing = true;
+  const tick = () => {
+    if (!d.playing) return;
+    if (d.i >= d.moves.length) { d.playing = false; learnDemoText(); return; }
+    learnDemoText();
+    const m = d.moves[d.i];
+    learnGo(d.i + 1, true);
+    d.timer = setTimeout(tick, m.endsWith('2') ? 900 : 700);
+  };
+  learnDemoText();
+  d.timer = setTimeout(tick, 300);
+}
+function learnStop() { const d = learn.demo; if (d) { d.playing = false; clearTimeout(d.timer); learnDemoText(); } }
+
+$('learnMethod').addEventListener('click', e => { const b = e.target.closest('[data-lm]'); if (!b) return; learn.method = b.dataset.lm; learn.step = 0; renderLearn(); });
+$('learnSteps').addEventListener('click', e => { const b = e.target.closest('[data-ls]'); if (!b) return; learn.step = Number(b.dataset.ls); renderLearn(); });
+$('learnAlgs').addEventListener('click', e => {
+  const card = e.target.closest('[data-la]'); if (!card) return;
+  const st = learnMethods()[learn.method].steps[learn.step], i = Number(card.dataset.la);
+  learnLoad(st.algs[i], i, st);
+  if (e.target.closest('[data-play]')) {
+    const r = $('learnDemo').getBoundingClientRect();     // on phones the demo cube is further down: bring it into view
+    if (r.top < 0 || r.bottom > innerHeight) $('learnDemo').scrollIntoView({ block: 'center', behavior: 'smooth' });
+    learnPlay();
+  }
+});
+$('learnPlay').onclick = learnPlay;
+$('learnRestart').onclick = () => { learnStop(); learnGo(0); };
+$('learnBack').onclick = () => { learnStop(); if (learn.demo) learnGo(learn.demo.i - 1); };
+$('learnFwd').onclick = () => { learnStop(); if (learn.demo) learnGo(learn.demo.i + 1, true); };
+$('learnPrev').onclick = () => { learn.step--; renderLearn(); $('tab-learn').scrollIntoView({ block: 'start', behavior: 'smooth' }); };
+$('learnNext').onclick = () => {
+  const n = learnMethods()[learn.method].steps.length;
+  if (learn.step >= n - 1) { toast(learn.method === 'beginner' ? 'You know the whole beginner method! Try it live in the Guide tab 🎉' : 'That\'s CFOP! Drill the cases in the Algorithms tab 🚀'); return; }
+  learn.step++; renderLearn(); $('tab-learn').scrollIntoView({ block: 'start', behavior: 'smooth' });
+};
+
 /* ----------------------------- Online (Supabase) ------------------------- */
 // Public project settings — the anon key is meant to be public; access is controlled by row-level security.
 const SUPABASE_URL = (window.SMARTCUBE_SUPABASE || {}).url || 'https://wweouoczrgidubsddeij.supabase.co';
@@ -5004,7 +5369,7 @@ if (typeof Cube === 'undefined') {
   let saved = 'guide';
   try { saved = localStorage.getItem('micube.tab') || 'guide'; } catch (e) { /* ignore */ }
   buildCases();
-  setMode(['timer', 'train', 'vs', 'turns'].includes(saved) ? saved : 'guide');
+  setMode(['timer', 'train', 'vs', 'turns', 'learn'].includes(saved) ? saved : 'guide');
   solver.init();
   autoReconnect();
   acctInit();

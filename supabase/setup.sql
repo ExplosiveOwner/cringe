@@ -377,3 +377,17 @@ grant execute on function public.report_match(text, uuid, integer, integer) to a
 revoke all on function public.check_badge() from public, anon, authenticated;
 revoke all on function public.limit_feature_requests() from public, anon, authenticated;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+-- Clean-up: remove badges that were added by hand before the check above existed
+-- (unknown badge names, and wins / MMR / time badges the profile doesn't back up).
+delete from public.user_badges b
+ using public.profiles p
+ where p.id = b.user_id
+   and (b.badge not in ('first_solve','guide_solved','sub60','sub30','sub20','sub10','solves100','streak7','turns50',
+                        'cross_opt','beginner_all','pll_all','oll_all','win1','mmr1200')
+        or (b.badge = 'win1' and coalesce(p.wins, 0) < 1)
+        or (b.badge = 'mmr1200' and coalesce(p.mmr, 0) < 1200)
+        or (b.badge = 'sub60' and (p.best_single is null or p.best_single >= 60000))
+        or (b.badge = 'sub30' and (p.best_single is null or p.best_single >= 30000))
+        or (b.badge = 'sub20' and (p.best_single is null or p.best_single >= 20000))
+        or (b.badge = 'sub10' and (p.best_single is null or p.best_single >= 10000)));

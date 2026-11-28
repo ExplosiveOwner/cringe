@@ -197,3 +197,16 @@ drop policy if exists "anyone can send a request" on public.feature_requests;
 create policy "anyone can send a request" on public.feature_requests for insert with check (true);
 revoke all on public.feature_requests from anon, authenticated;
 grant insert (message, contact, page) on public.feature_requests to anon, authenticated;
+
+-- ---------------------------------------------------------------------------
+-- "Delete my account" (GDPR): removes the signed-in user. Their profile, badges
+-- and match reports go with it; finished matches keep the result without the name.
+-- ---------------------------------------------------------------------------
+create or replace function public.delete_my_account()
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'not signed in'; end if;
+  delete from auth.users where id = auth.uid();
+end $$;
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;

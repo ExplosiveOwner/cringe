@@ -340,6 +340,7 @@
   @media (max-width: 700px) { #lbMini tr:nth-child(n+7):not(.me) { display: none; } }
   @media (max-width: 700px) { .acct-chip #acctLabel { max-width: 90px; } #btnAccount { position: absolute; top: 8px; right: 54px; } }
   .credits { padding-left: 18px; line-height: 1.6; }
+  .privacy p { line-height: 1.55; margin: 6px 0; }
   .site-foot { max-width: 1480px; margin: 0 auto; padding: 8px 20px 28px; display: flex; flex-wrap: wrap; gap: 10px;
     align-items: center; justify-content: space-between; color: var(--muted); font-size: 14px; }
   #featureText, #featureContact { width: 100%; font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
@@ -366,7 +367,10 @@
   @media (min-width: 1100px) {
     main { grid-template-columns: minmax(420px, 500px) minmax(0, 1fr); max-width: 1480px; gap: 20px; padding: 20px; }
     #liveSection { position: sticky; top: 20px; align-self: start; max-height: calc(100vh - 40px); overflow-y: auto; }
-    .scene { --s: 1.45; }
+    .scene { --s: 1.05; }
+    /* cube and flat view side by side so the leaderboard fits on screen below them */
+    #liveSection .views { flex-wrap: nowrap; gap: 14px; justify-content: space-between; }
+    #liveSection .net { width: min(48%, 230px); flex: none; }
     .timer { font-size: 96px; }
     .vs-timer { font-size: 64px; }
     .mini-scene { width: 170px; height: 170px; }
@@ -856,7 +860,7 @@
   </section>
 </main>
 <footer class="site-foot">
-  <span>Smart Cube · made with 🧊 · <a href="#" id="btnCredits">Credits</a></span>
+  <span>Smart Cube · made with 🧊 · <a href="#" id="btnPrivacy">Privacy</a> · <a href="#" id="btnCredits">Credits</a></span>
   <div class="row">
     <button id="btnSupport" title="Support the project on Ko-fi">☕ Support on Ko-fi</button>
     <button id="btnFeature">💡 Request a feature</button>
@@ -897,7 +901,7 @@
       <div class="tbl-wrap"><table id="leaderboard"></table></div>
       <div class="row" style="margin-top:12px;justify-content:space-between">
         <span class="msg" style="margin:0">Ranked: in 1v1, when you and your opponent are both signed in, the host can tick “Ranked”.</span>
-        <button id="acctOutBtn" class="danger">Sign out</button>
+        <div class="row"><button id="acctOutBtn">Sign out</button><button id="acctDelete" class="danger">Delete my account</button></div>
       </div>
     </div>
   </div>
@@ -919,6 +923,33 @@
       <span class="msg" id="featureMsg" style="margin:0"></span>
       <button class="primary" id="featureSend">Send</button>
     </div>
+  </div>
+</dialog>
+<dialog class="sheet" id="privacyDlg">
+  <div class="sheet-head"><h2>Privacy</h2><button class="icon-btn" id="privacyClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body privacy">
+    <p class="msg" style="margin-top:10px">Short version: no ads, no tracking, no selling of data. An account is optional — everything except rankings and online badges works without one.</p>
+    <h3>On your own device</h3>
+    <p>Your solves, times, algorithm progress, settings and colours are saved in this browser only. They never leave your device unless you export a backup. You can delete them by clearing this site's data in your browser.</p>
+    <h3>If you create an account</h3>
+    <p>Stored in our database (Supabase): your <b>e-mail address</b> and <b>password</b> (stored securely hashed — nobody can read it), your <b>username</b>, <b>avatar</b>, <b>MMR</b>, <b>wins/losses</b>, <b>best single</b>, <b>badges</b> and the results of your <b>ranked 1v1 rounds</b>.</p>
+    <p>Your e-mail is only used to let you sign in. It is never shown to other players, never shared, and never used for newsletters or advertising. Your username, avatar, MMR, wins/losses and badges are public (leaderboard).</p>
+    <h3>Feature requests</h3>
+    <p>When you send an idea, we store your message, the optional name/e-mail you add, and (if you're signed in) your account ID — only to read and answer it.</p>
+    <h3>1v1 games</h3>
+    <p>Players connect directly to each other (WebRTC). The free PeerJS service is used to find each other with the game code; it sees your IP address while connecting. Cube moves and times go directly between the devices in the game (and to people watching) and are not stored — except the result of ranked rounds, as described above.</p>
+    <h3>Services this site uses</h3>
+    <ul class="credits">
+      <li><b>GitHub Pages</b> — hosts the website</li>
+      <li><b>Supabase</b> — accounts, rankings and feature requests</li>
+      <li><b>Cloudflare Turnstile</b> — the robot check at sign-in (it looks at technical signals from your browser to stop bots)</li>
+      <li><b>PeerJS</b> — connecting 1v1 players</li>
+      <li><b>jsDelivr</b> and <b>Google Fonts</b> — deliver code libraries and fonts</li>
+    </ul>
+    <p class="msg">Like any website, these services can see your IP address when your browser contacts them.</p>
+    <h3>Your rights</h3>
+    <p>You can see your account data in your profile and change your username and avatar there. You can <b>delete your account yourself</b> at any time: profile → <i>Delete my account</i>. That removes your e-mail, profile, badges and match reports immediately; past ranked results stay in your opponents' history without your name. For any other question or request (for example a copy of your data), use “Request a feature” and leave a way to reach you.</p>
+    <p class="msg">You also have the right to complain to the Belgian Data Protection Authority (gegevensbeschermingsautoriteit.be).</p>
   </div>
 </dialog>
 <dialog class="sheet" id="creditsDlg">
@@ -4846,8 +4877,22 @@ $('supportShare').onclick = async () => {
   catch (e) { /* cancelled */ }
 };
 $('btnCredits').onclick = e => { e.preventDefault(); $('creditsDlg').showModal(); };
+$('btnPrivacy').onclick = e => { e.preventDefault(); $('privacyDlg').showModal(); };
+$('privacyClose').onclick = () => $('privacyDlg').close();
+$('acctDelete').onclick = async () => {
+  if (!acct.session) return;
+  if (!confirm('Delete your account? Your e-mail, profile, MMR, badges and ranked history are removed permanently. Your solves on this device stay.')) return;
+  if (prompt('Type DELETE to confirm') !== 'DELETE') return;
+  try {
+    const db = await sb();
+    const { error } = await db.rpc('delete_my_account');
+    if (error) throw error;
+    await db.auth.signOut();
+    $('accountDlg').close(); toast('Your account has been deleted.');
+  } catch (e) { alert('Could not delete the account: ' + (e.message || e)); }
+};
 $('creditsClose').onclick = () => $('creditsDlg').close();
-for (const id of ['featureDlg', 'supportDlg', 'creditsDlg']) $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).close(); });
+for (const id of ['featureDlg', 'supportDlg', 'creditsDlg', 'privacyDlg']) $(id).addEventListener('click', e => { if (e.target === $(id)) $(id).close(); });
 
 $('netToggle').onclick = () => {
   const v = document.querySelector('.views');

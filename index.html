@@ -349,6 +349,24 @@
   #featureText, #featureContact { width: 100%; font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line);
     border-radius: 10px; padding: 10px; margin-top: 8px; resize: vertical; }
   @media (max-width: 700px) { .site-foot { padding-bottom: calc(86px + env(safe-area-inset-bottom)); justify-content: center; } }
+  /* Algorithm recorder */
+  .rec-box { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-height: 84px;
+    font: 600 20px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-spacing: 4px; overflow-wrap: anywhere; }
+  .rec-box.on { border-color: #e5484d; box-shadow: 0 0 0 3px color-mix(in srgb, #e5484d 25%, transparent); }
+  .rec-box .last { color: var(--accent); }
+  .rec-box .miss { color: #e5484d; }
+  .rec-meta { font-size: 13px; color: var(--muted); margin-top: 6px; min-height: 18px; }
+  #recBtn.on { background: #e5484d; border-color: #e5484d; color: #fff; }
+  .rec-play { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 14px; background: var(--panel2); border-radius: 12px; padding: 10px; }
+  .rec-scene { --s: .8; }
+  .rec-play-side { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .rec-item { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; background: var(--panel2);
+    border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-bottom: 8px; }
+  .rec-item .nm { font-weight: 700; }
+  .rec-item code { font: 600 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; display: block; overflow-wrap: anywhere; }
+  .rec-item .sm { font-size: 12px; color: var(--muted); }
+  .rec-item .row { gap: 6px; }
+  .rec-item button { padding: 3px 9px; font-size: 13px; }
   /* Learn tab */
   .learn-steps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
   .learn-steps button { font-size: 13px; padding: 5px 10px; border-radius: 999px; }
@@ -753,6 +771,39 @@
       </div>
     </div>
     <div id="tab-turns" class="hidden">
+      <div class="seg" id="turnsSeg" style="margin-bottom:12px">
+        <button data-tp="practice">Notation practice</button><button data-tp="rec">⏺ Algorithm recorder</button>
+      </div>
+      <div id="recPanel" class="hidden">
+        <div class="opts" style="margin-top:0">
+          <label>Hold <select id="recGrip"><option value="white">White on top</option><option value="yellow">Yellow on top</option></select></label>
+          <span>green in front</span>
+          <label class="chk"><input type="checkbox" id="recSlices" checked> Middle layers as M E S</label>
+          <label class="chk"><input type="checkbox" id="recMerge" checked> Combine repeats (R R → R2)</label>
+        </div>
+        <div class="rec-box" id="recBox"><span class="msg">Press <b>Record</b> and turn your cube — every move is written down in notation.</span></div>
+        <div class="rec-meta" id="recMeta"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="primary" id="recBtn">⏺ Record</button>
+          <button id="recUndo">↶ Undo last</button>
+          <button id="recClear">Clear</button>
+          <button id="recCopy">Copy</button>
+          <button id="recCopyInv" title="The moves that undo it (to set the case up again)">Copy inverse</button>
+          <button id="recSave">💾 Save</button>
+        </div>
+        <div class="rec-play">
+          <div class="scene rec-scene" id="recScene"><div class="cube3d" id="recCube"></div></div>
+          <div class="rec-play-side">
+            <div class="learn-demo-name" id="recPlayName">Replay a recording here</div>
+            <div class="learn-demo-alg" id="recPlayAlg"></div>
+            <div class="row learn-ctl"><button id="recPlayBtn" disabled>▶ Play</button></div>
+          </div>
+        </div>
+        <h3>Saved algorithms</h3>
+        <div id="recList"></div>
+        <div class="msg">Middle-layer turns (M E S) are recognised. The cube can't feel whole-cube rotations (x y z) or tell a wide turn from its opposite face (r = L plus a rotation), so after a wide turn the next moves are named as if you hadn't turned the cube. Do wide turns as two turns (r = R M') while recording.</div>
+      </div>
+      <div id="tuPractice">
       <div class="opts" style="margin-top:0">
         <label class="chk"><input type="checkbox" data-lvl="basic" checked> R L U D F B</label>
         <label class="chk"><input type="checkbox" data-lvl="prime" checked> Prime (')</label>
@@ -795,6 +846,7 @@
       <div class="msg">Green = you know it (mostly right), amber = learning, red = often wrong. Tap a symbol to see it on the demo cube.
         Whole-cube rotations (x y z) aren't included: the cube can't feel them.</div>
       <div class="row" style="margin-top:8px"><button id="tuReset" class="danger">Reset turn stats</button></div>
+      </div>
     </div>
 
     <!-- 1v1: live race against another player -->
@@ -3997,7 +4049,7 @@ function onStateChange(state, move) {
   else if (mode === 'train' && train.set === 'cross') crossOnState();
   else if (mode === 'train') trainOnState(prev, moves || (train.phase === 'running' ? ['?'] : []));
   else if (mode === 'vs') vsOnState(prev, moves);
-  else if (mode === 'turns') tuOnState();
+  else if (mode === 'turns') { if (rec.on) recOnMoves(prev, moves); else tuOnState(); }
   else guideOnState(move || (moves && moves[0]), prev);
 }
 
@@ -4022,6 +4074,7 @@ function setMode(m) {
   $('tab-turns').classList.toggle('hidden', m !== 'turns');
   $('tab-learn').classList.toggle('hidden', m !== 'learn');
   if (m !== 'turns' && tu.on) { tu.on = false; clearTimeout(tu.timer); }
+  if (m !== 'turns' && rec.on) recStop();
   try { localStorage.setItem('micube.tab', m); } catch (e) { /* ignore */ }
   if (m !== 'train' && train.phase !== 'off') stopTraining();
   if (m !== 'learn') learnStop();
@@ -4662,6 +4715,180 @@ const inScene = e => e.target instanceof Element && !!e.target.closest('.scene')
 document.addEventListener('pointerdown', e => { if (inScene(e)) { e.preventDefault(); getSelection().removeAllRanges(); } }, true);
 document.addEventListener('dragstart', e => { if (inScene(e)) e.preventDefault(); }, true);
 document.addEventListener('selectstart', e => { if (inScene(e)) e.preventDefault(); }, true);
+
+/* ----------------------------- Algorithm recorder -------------------------
+ * The cube reports face turns relative to its own centres. A middle-layer turn arrives as two opposite
+ * face turns (M = R + L') and turns the centres, so after it the cube's "U" may be your front. We track
+ * how the centres sit in your hands (ori: your face -> the cube's face) to name every move as you see it. */
+const ROT_POS = { x: { F: 'U', U: 'B', B: 'D', D: 'F', R: 'R', L: 'L' }, y: { F: 'L', L: 'B', B: 'R', R: 'F', U: 'U', D: 'D' },
+  z: { U: 'R', R: 'D', D: 'L', L: 'U', F: 'F', B: 'B' } };
+const SLICE_ROT = { M: ['x', -1], E: ['y', -1], S: ['z', 1] };     // the centres turn like x' for M, y' for E, z for S
+const rec = { on: false, items: [], ori: null, start: null, startGrip: 'white', t0: 0, saved: [], view: null, play: null };
+try { rec.saved = JSON.parse(localStorage.getItem('micube.recs.v1') || '[]'); } catch (e) { rec.saved = []; }
+try { $('recGrip').value = localStorage.getItem('micube.recgrip') || begGrip; } catch (e) { /* ignore */ }
+const saveRecs = () => { try { localStorage.setItem('micube.recs.v1', JSON.stringify(rec.saved)); } catch (e) { /* ignore */ } };
+const startOri = grip => grip === 'yellow' ? { U: 'D', D: 'U', R: 'L', L: 'R', F: 'F', B: 'B' } : { U: 'U', D: 'D', R: 'R', L: 'L', F: 'F', B: 'B' };
+/** ori after the centres turned by `axis` (`times` quarter turns, -1 = prime). */
+function turnOri(ori, axis, times) {
+  const pos = ROT_POS[axis], inv = Object.fromEntries(Object.entries(pos).map(([a, b]) => [b, a]));
+  let o = ori;
+  for (let k = 0; k < Math.abs(times); k++) {
+    // the centres move by R = rotation^-times; the cube face now in your position p came from R^-1(p)
+    const step = times < 0 ? pos : inv, n = {};
+    for (const p of FACES) n[p] = o[step[p]];
+    o = n;
+  }
+  return o;
+}
+const handFace = (ori, coreFace) => [...FACES].find(h => ori[h] === coreFace);
+
+function recOnMoves(prev, moves) {
+  const now = performance.now();
+  if (!moves) { rec.items.push({ m: '?', t: now }); recRender(); return; }
+  for (const cm of moves) {
+    const hm = handFace(rec.ori, cm[0]) + cm.slice(1);
+    const last = rec.items[rec.items.length - 1];
+    // two opposite face turns at (almost) the same moment = one middle-layer turn
+    if ($('recSlices').checked && last && !last.slice && last.m !== '?' && now - last.t <= 120 && last.m[0] === OPPOSITE[hm[0]]) {
+      const sl = SLICE_PAIRS[last.m + ' ' + hm] || SLICE_PAIRS[hm + ' ' + last.m];
+      if (sl) {
+        Object.assign(last, { m: sl, slice: true, t: now });
+        const [axis, dir] = SLICE_ROT[sl[0]], amt = sl.endsWith('2') ? 2 : sl.endsWith("'") ? -1 : 1;
+        rec.ori = turnOri(rec.ori, axis, dir * amt);
+        continue;
+      }
+    }
+    rec.items.push({ m: hm, t: now });
+  }
+  recRender();
+}
+/** Recorded moves as text: repeats of one face combined (R R → R2, R R' cancels). */
+function recMoves(items = rec.items, merge = $('recMerge').checked) {
+  const out = [];
+  for (const it of items) {
+    const m = it.m, last = out[out.length - 1];
+    if (merge && m !== '?' && last && last !== '?' && last[0] === m[0]) {
+      const amt = x => x.endsWith('2') ? 2 : x.endsWith("'") ? 3 : 1;
+      const a = (amt(last) + amt(m)) % 4;
+      out.pop();
+      if (a) out.push(m[0] + ['', '', '2', "'"][a]);
+      continue;
+    }
+    out.push(m);
+  }
+  return out;
+}
+const recAlg = () => recMoves().join(' ');
+function recRender() {
+  const ms = recMoves();
+  $('recBox').classList.toggle('on', rec.on);
+  $('recBox').innerHTML = ms.length
+    ? ms.map((m, i) => `<span class="${m === '?' ? 'miss' : i === ms.length - 1 && rec.on ? 'last' : ''}">${m === '?' ? '?' : m}</span>`).join(' ')
+    : `<span class="msg">${rec.on ? 'Recording… turn your cube.' : 'Press <b>Record</b> and turn your cube — every move is written down in notation.'}</span>`;
+  const real = ms.filter(m => m !== '?'), secs = rec.items.length > 1 ? (rec.items[rec.items.length - 1].t - rec.items[0].t) / 1000 : 0;
+  $('recMeta').textContent = real.length
+    ? `${real.length} moves · ${algTurns(real.join(' '))} turns (middle layers count as 2)${secs ? ` · ${secs.toFixed(1)} s` : ''}${ms.includes('?') ? ' · ? = a move the cube didn\'t report clearly' : ''}`
+    : '';
+  $('recBtn').textContent = rec.on ? '■ Stop' : '⏺ Record';
+  $('recBtn').classList.toggle('on', rec.on);
+  for (const id of ['recUndo', 'recClear', 'recCopy', 'recCopyInv', 'recSave']) $(id).disabled = !rec.items.length;
+  $('recGrip').disabled = rec.on || rec.items.length > 0;
+}
+function recStart() {
+  if (!rec.items.length) { rec.ori = startOri($('recGrip').value); rec.start = current; rec.startGrip = $('recGrip').value; }
+  rec.on = true; recRender();
+}
+function recStop() { rec.on = false; recRender(); }
+async function recCopy(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`${what} copied ✓`); } catch (e) { prompt('Copy:', text); }
+}
+/** The cube as you held it when recording started (yellow on top = turned over). */
+const recHeldStart = (start, grip) => grip === 'yellow' ? applyMoves(start, 'z2') : start;
+
+$('turnsSeg').addEventListener('click', e => {
+  const b = e.target.closest('[data-tp]'); if (!b) return;
+  const r = b.dataset.tp === 'rec';
+  if (!r && rec.on) recStop();
+  if (r && tu.on) { tu.on = false; clearTimeout(tu.timer); tuRender(); }
+  $('recPanel').classList.toggle('hidden', !r); $('tuPractice').classList.toggle('hidden', r);
+  document.querySelectorAll('#turnsSeg button').forEach(x => x.classList.toggle('active', x === b));
+  try { localStorage.setItem('micube.turnspane', b.dataset.tp); } catch (err) { /* ignore */ }
+  if (r) { recRender(); recRenderList(); }
+});
+(() => { let pane = 'practice'; try { pane = localStorage.getItem('micube.turnspane') || 'practice'; } catch (e) { /* ignore */ }
+  document.querySelector(`#turnsSeg [data-tp="${pane}"]`).click(); })();
+$('recGrip').onchange = e => { try { localStorage.setItem('micube.recgrip', e.target.value); } catch (err) { /* ignore */ } };
+$('recBtn').onclick = () => (rec.on ? recStop() : recStart());
+$('recUndo').onclick = () => {
+  const it = rec.items.pop();
+  if (it && it.slice) { const [axis, dir] = SLICE_ROT[it.m[0]], amt = it.m.endsWith('2') ? 2 : it.m.endsWith("'") ? -1 : 1; rec.ori = turnOri(rec.ori, axis, -dir * amt); }
+  recRender();
+};
+$('recClear').onclick = () => { rec.items = []; rec.ori = startOri($('recGrip').value); rec.start = current; recRender(); };
+$('recSlices').onchange = recRender; $('recMerge').onchange = recRender;
+$('recCopy').onclick = () => recCopy(recAlg(), 'Algorithm');
+$('recCopyInv').onclick = () => recCopy(invertAlg(recMoves().filter(m => m !== '?').join(' ')), 'Inverse');
+$('recSave').onclick = () => {
+  const alg = recMoves().filter(m => m !== '?').join(' ');
+  if (!alg) return;
+  const name = (prompt('Name for this algorithm:', `My algorithm ${rec.saved.length + 1}`) || '').trim().slice(0, 40);
+  if (!name) return;
+  rec.saved.unshift({ id: Date.now().toString(36), name, alg, start: rec.start, grip: rec.startGrip, date: Date.now() });
+  saveRecs(); recRenderList(); toast('Saved 💾');
+};
+function recRenderList() {
+  $('recList').innerHTML = rec.saved.length ? rec.saved.map(r => `<div class="rec-item" data-rid="${r.id}">
+      <div style="min-width:0;flex:1"><div class="nm">${escapeHtml(r.name)}</div><code>${escapeHtml(r.alg)}</code>
+        <div class="sm">${splitAlg(r.alg).length} moves · ${r.grip === 'yellow' ? 'yellow' : 'white'} on top · ${new Date(r.date).toLocaleDateString()}</div></div>
+      <div class="row"><button data-ra="play">▶ Play</button><button data-ra="copy">Copy</button><button data-ra="del" class="danger">Delete</button></div></div>`).join('')
+    : '<div class="msg">Nothing saved yet. Record an algorithm and press Save.</div>';
+}
+$('recList').addEventListener('click', e => {
+  const b = e.target.closest('[data-ra]'), item = e.target.closest('[data-rid]'); if (!b || !item) return;
+  const r = rec.saved.find(x => x.id === item.dataset.rid); if (!r) return;
+  if (b.dataset.ra === 'copy') recCopy(r.alg, 'Algorithm');
+  else if (b.dataset.ra === 'del') { if (confirm(`Delete “${r.name}”?`)) { rec.saved = rec.saved.filter(x => x !== r); saveRecs(); recRenderList(); } }
+  else recLoad(r.name, r.alg, recHeldStart(r.start || SOLVED, r.grip), true);
+});
+
+/* replay on a small 3D cube, from the state the cube was in when recording started */
+function recView() {
+  if (rec.view) return rec.view;
+  rec.view = new CubeView($('recCube'));
+  $('recCube').style.transform = `scale(${parseFloat(getComputedStyle($('recScene')).getPropertyValue('--s')) || 0.8}) rotateX(-28deg) rotateY(-38deg)`;
+  return rec.view;
+}
+function recLoad(name, alg, start, autoplay) {
+  const p = rec.play; if (p) clearTimeout(p.timer);
+  const moves = splitAlg(alg), states = [start];
+  for (const m of moves) states.push(applyMoves(states[states.length - 1], m));
+  rec.play = { moves, states, i: 0, timer: 0, playing: false };
+  recView().paint(start);
+  $('recPlayName').textContent = name; $('recPlayBtn').disabled = !moves.length;
+  recPlayText();
+  if (autoplay) recPlay();
+}
+function recPlayText() {
+  const p = rec.play; if (!p) return;
+  $('recPlayAlg').innerHTML = p.moves.map((m, i) => `<span class="${i < p.i ? 'done' : i === p.i && p.playing ? 'now' : ''}">${m}</span>`).join(' ');
+  $('recPlayBtn').textContent = p.playing ? '⏸ Pause' : p.i >= p.moves.length ? '↺ Again' : '▶ Play';
+}
+function recPlay() {
+  const p = rec.play; if (!p) return;
+  if (p.playing) { p.playing = false; clearTimeout(p.timer); recPlayText(); return; }
+  if (p.i >= p.moves.length) { p.i = 0; recView().paint(p.states[0]); }
+  p.playing = true;
+  const tick = () => {
+    if (!p.playing || rec.play !== p) return;
+    if (p.i >= p.moves.length) { p.playing = false; recPlayText(); return; }
+    recPlayText();
+    recView().show(p.states[p.i + 1], p.states[p.i], [p.moves[p.i]], true);
+    const m = p.moves[p.i]; p.i++;
+    p.timer = setTimeout(tick, m.endsWith('2') ? 850 : 650);
+  };
+  recPlayText(); p.timer = setTimeout(tick, 300);
+}
+$('recPlayBtn').onclick = recPlay;
 
 /* ----------------------------- Learn: step-by-step method guides ---------
  * Every picture and demo is made by undoing the algorithm from a solved cube, so what you see

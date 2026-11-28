@@ -54,6 +54,8 @@
   .views { display: flex; flex-wrap: wrap; gap: 18px; align-items: center; justify-content: center; }
   .scene { --s: 1; width: calc(210px * var(--s)); height: calc(210px * var(--s)); perspective: calc(700px * var(--s));
     touch-action: none; cursor: grab; flex: none; margin: 0 auto; }
+  /* dragging a cube must never start a browser drag or text selection (that shows a "no entry" cursor) */
+  .scene, .scene * { user-select: none; -webkit-user-select: none; -webkit-user-drag: none; }
   .cube3d { position: relative; width: 120px; height: 120px; margin: calc((210px * var(--s) - 120px) / 2); transform-style: preserve-3d; }
   .net-toggle { display: none; font-size: 12px; padding: 2px 8px; }
   .cubie { position: absolute; left: 40px; top: 40px; width: 40px; height: 40px; transform-style: preserve-3d; }
@@ -4654,6 +4656,12 @@ $('patGrid').onclick = e => { const b = e.target.closest('[data-pat]'); if (b) s
 $('misReplay').onclick = replayMistake;
 $('misClose').onclick = hideMistake;
 $('xNew').onclick = crossNew;
+
+// Any cube view: a press starts a rotation, never a text selection or a browser drag-and-drop.
+const inScene = e => e.target instanceof Element && !!e.target.closest('.scene');
+document.addEventListener('pointerdown', e => { if (inScene(e)) { e.preventDefault(); getSelection().removeAllRanges(); } }, true);
+document.addEventListener('dragstart', e => { if (inScene(e)) e.preventDefault(); }, true);
+document.addEventListener('selectstart', e => { if (inScene(e)) e.preventDefault(); }, true);
 
 /* ----------------------------- Learn: step-by-step method guides ---------
  * Every picture and demo is made by undoing the algorithm from a solved cube, so what you see

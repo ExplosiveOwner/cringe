@@ -438,3 +438,8 @@ begin
 end $$;
 revoke all on function public.limit_feature_requests() from public, anon, authenticated;
 create index if not exists feature_requests_user_idx on public.feature_requests (user_id, created_at);
+
+-- Feature requests: a real check in the insert policy (Supabase advisor: "RLS policy always true").
+drop policy if exists "anyone can send a request" on public.feature_requests;
+create policy "anyone can send a request" on public.feature_requests for insert
+  with check (char_length(message) between 5 and 2000 and (contact is null or char_length(contact) <= 120));

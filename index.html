@@ -4630,29 +4630,39 @@ const sfx = {
       const n = Math.floor(ac.sampleRate * 0.06); this.noise = ac.createBuffer(1, n, ac.sampleRate);
       const d = this.noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
     }
-    const t0 = ac.currentTime + 0.002, jit = (a, b) => a + Math.random() * (b - a);
-    const out = ac.createGain(); out.gain.value = 0.9; out.connect(ac.destination);
-    const burst = (t, dur, type, freq, q, vol) => {      // filtered noise with a fast decay
+    const t0 = ac.currentTime + 0.003, jit = (a, b) => a + Math.random() * (b - a);
+    // everything passes a gentle low-pass (no harsh fizz) and a master gain
+    const out = ac.createGain(), lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 6500; lp.Q.value = 0.5; out.gain.value = 0.9;
+    out.connect(lp).connect(ac.destination);
+    // soft envelope: fade in over `att`, then a smooth exponential-like fade (no hard start or stop)
+    const env = (g, t, vol, att, dur) => {
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol, t + att);
+      g.gain.setTargetAtTime(0, t + att, dur / 3.5);
+      return t + att + dur * 2;                       // by then it has faded to silence
+    };
+    const burst = (t, dur, type, freq, q, vol, att = 0.0015) => {      // filtered noise
       const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
       src.buffer = this.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
-      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      src.connect(f).connect(g).connect(out); src.start(t, Math.random() * 0.02); src.stop(t + dur + 0.01);
+      const end = env(g, t, vol, att, dur);
+      src.connect(f).connect(g).connect(out); src.start(t, Math.random() * 0.02); src.stop(Math.min(end, t + 0.055));
     };
-    const pip = (t, freq, dur, vol, type = 'sine') => {   // a short pitched ping / thump
+    const pip = (t, freq, dur, vol, att = 0.002) => {   // a short pitched ping / thump (pure sine: no buzzy edges)
       const o = ac.createOscillator(), g = ac.createGain();
-      o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 0.7, t + dur);
-      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.01);
+      o.type = 'sine'; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 0.75, t + att + dur);
+      const end = env(g, t, vol, att, dur);
+      o.connect(g).connect(out); o.start(t); o.stop(end);
     };
-    // 1. the click: a bright, very short snap
-    burst(t0, 0.006, 'highpass', jit(3200, 4200), 0.8, 0.55);
-    pip(t0, jit(4200, 5200), 0.007, 0.12, 'triangle');
+    // 1. the click: a bright, short snap
+    burst(t0, 0.007, 'highpass', jit(2800, 3600), 0.7, 0.45, 0.001);
+    pip(t0, jit(3600, 4400), 0.008, 0.06, 0.001);
     // 2. bottom-out ~10 ms later: the plastic "clack" plus a little body thump
     const tb = t0 + jit(0.008, 0.013);
-    burst(tb, 0.035, 'bandpass', jit(1300, 1900), 2.2, 0.45);
-    pip(tb, jit(210, 280), 0.045, 0.22);
+    burst(tb, 0.03, 'bandpass', jit(1300, 1800), 1.8, 0.4, 0.002);
+    pip(tb, jit(200, 260), 0.04, 0.2, 0.003);
     // 3. a quiet release tick as the key comes back up
-    burst(tb + jit(0.055, 0.075), 0.012, 'bandpass', jit(2400, 3000), 2, 0.12);
+    burst(tb + jit(0.055, 0.075), 0.012, 'bandpass', jit(2200, 2800), 1.6, 0.1, 0.002);
   },
   tone(freqs, { dur = 0.22, type = 'sine', vol = 0.12, gap = 0.08 } = {}) {
     if (!prefs.effects) return;

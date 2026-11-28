@@ -332,6 +332,7 @@
   #leaderboard th:nth-child(2), #leaderboard td:nth-child(2) { text-align: left; }
   .lb-card { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
   .lb-table { margin-top: 6px; }
+  .lb-seg button { padding: 4px 10px; font-size: 13px; }
   .lb-table td, .lb-table th { padding: 5px 6px; }
   .lb-table th:nth-child(2), .lb-table td:nth-child(2) { text-align: left; }
   .lb-table tr.me td { color: var(--accent); font-weight: 700; }
@@ -481,7 +482,10 @@
     <div class="lb-card" id="lbCard">
       <div class="row" style="justify-content:space-between">
         <h3 style="margin:0">🏆 Leaderboard</h3>
-        <button id="lbMore">View all</button>
+        <div class="row" style="gap:6px">
+          <div class="seg lb-seg"><button data-lb="fast" class="active">⏱ Fastest</button><button data-lb="mmr">MMR</button></div>
+          <button id="lbMore">View all</button>
+        </div>
       </div>
       <table class="lb-table" id="lbMini"><tr><td class="msg">Loading…</td></tr></table>
     </div>
@@ -909,7 +913,8 @@
 <dialog class="sheet" id="lbDlg">
   <div class="sheet-head"><h2>🏆 Leaderboard</h2><button class="icon-btn" id="lbClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <div class="sheet-body">
-    <p class="msg" style="margin-top:10px">Ranked 1v1 players with at least 3 ranked rounds, by MMR.</p>
+    <div class="seg lb-seg" style="margin-top:10px"><button data-lb="fast" class="active">⏱ Fastest solves</button><button data-lb="mmr">🏆 MMR</button></div>
+    <p class="msg" id="lbFullNote" style="margin-top:8px"></p>
     <div class="tbl-wrap"><table class="lb-table" id="lbFull"></table></div>
   </div>
 </dialog>
@@ -2453,7 +2458,7 @@ function finishSolve(total) {
   $('timer').textContent = fmt(total);
   renderStats(); renderHistory(); renderDetail();
   checkBadges();
-  if (acct.session && acct.profile && (!acct.profile.best_single || effTime(solve) < acct.profile.best_single)) loadProfile().then(renderAcctChip).catch(() => {});
+  if (acct.session && acct.profile && (!acct.profile.best_single || effTime(solve) < acct.profile.best_single)) loadProfile().then(() => { renderAcctChip(); renderLeaderboards(true); }).catch(() => {});
   renderTimer(`Solved in ${fmt(total)}. Next scramble…`);
   setTimeout(() => { if (timer.phase === 'idle' && mode === 'timer') newScramble(); }, 800);
 }
@@ -4675,17 +4680,35 @@ function renderAcctChip() {
 }
 
 /* Leaderboard: players with at least 3 ranked rounds (brand-new or fake accounts never show up). */
-let lbCache = { at: 0, rows: null, err: null };
-async function fetchLeaderboard(force) {
-  if (!force && lbCache.rows && Date.now() - lbCache.at < 30000) return lbCache;
+let lbMode = 'fast';
+try { lbMode = localStorage.getItem('micube.lbMode') || 'fast'; } catch (e) { /* ignore */ }
+const lbCaches = { fast: { at: 0, rows: null, err: null }, mmr: { at: 0, rows: null, err: null } };
+let lbCache = lbCaches.mmr;                   // the MMR list (used by the account sheet)
+async function fetchLeaderboard(force, which = 'mmr') {
+  const cache = lbCaches[which];
+  if (!force && cache.rows && Date.now() - cache.at < 30000) return cache;
   try {
     const db = await sb();
-    const { data, error } = await db.from('profiles').select('id, username, avatar, mmr, wins, losses').gte('games', 3)
-      .order('mmr', { ascending: false }).order('wins', { ascending: false }).limit(50);
+    const base = db.from('profiles').select('id, username, avatar, mmr, wins, losses, best_single');
+    const { data, error } = which === 'fast'
+      ? await base.gte('best_single', 3000).order('best_single', { ascending: true }).limit(50)
+      : await base.gte('games', 3).order('mmr', { ascending: false }).order('wins', { ascending: false }).limit(50);
     if (error) throw error;
-    lbCache = { at: Date.now(), rows: data || [], err: null };
-  } catch (e) { lbCache = { at: Date.now(), rows: lbCache.rows, err: e.message || String(e) }; }
-  return lbCache;
+    Object.assign(cache, { at: Date.now(), rows: data || [], err: null });
+  } catch (e) { Object.assign(cache, { at: Date.now(), err: e.message || String(e) }); }
+  return cache;
+}
+function lbFastHTML(rows, limit) {
+  const pf = acct.profile, medal = i => ['🥇', '🥈', '🥉'][i] || i + 1;
+  const list = rows.slice(0, limit);
+  let html = '<tr><th class="rank">#</th><th>Player</th><th>Best single</th></tr>' + (list.length
+    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${fmt(r.best_single)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="msg">No solves yet — sign in and do a timed solve to be the first!</td></tr>');
+  if (pf) {
+    const at = rows.findIndex(r => r.id === pf.id);
+    if (at < 0 || at >= limit) html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${pf.avatar} ${escapeHtml(pf.username)}</td><td>${pf.best_single ? fmt(pf.best_single) : 'do a timed solve'}</td></tr>`;
+  }
+  return html;
 }
 function lbHTML(rows, limit, wl) {
   const pf = acct.profile, medal = i => ['🥇', '🥈', '🥉'][i] || i + 1;
@@ -4704,13 +4727,26 @@ function lbHTML(rows, limit, wl) {
 }
 async function renderLeaderboards(force) {
   if (!onlineReady()) { $('lbCard').classList.add('hidden'); return; }
-  const { rows, err } = await fetchLeaderboard(force);
+  document.querySelectorAll('.lb-seg button').forEach(b => b.classList.toggle('active', b.dataset.lb === lbMode));
+  $('lbFullNote').textContent = lbMode === 'fast'
+    ? 'Each player\'s best timed solve (signed-in players). Times under 3 s are not accepted.'
+    : 'Ranked 1v1 players with at least 3 ranked rounds, by MMR.';
+  const { rows, err } = await fetchLeaderboard(force, lbMode);
+  const html = (limit, full) => lbMode === 'fast' ? lbFastHTML(rows, limit) : lbHTML(rows, limit, full);
   if (!rows) { $('lbMini').innerHTML = `<tr><td class="msg">Leaderboard unavailable${err ? ': ' + escapeHtml(err) : ''}</td></tr>`; return; }
-  $('lbMini').innerHTML = lbHTML(rows, 10, false);
-  if ($('lbDlg').open) $('lbFull').innerHTML = lbHTML(rows, 50, true);
-  if ($('accountDlg').open && acct.session) $('leaderboard').innerHTML = lbHTML(rows, 50, true);
+  $('lbMini').innerHTML = html(10, false);
+  if ($('lbDlg').open) $('lbFull').innerHTML = html(50, true);
+  if ($('accountDlg').open && acct.session) {
+    const m = await fetchLeaderboard(false, 'mmr');
+    if (m.rows) $('leaderboard').innerHTML = lbHTML(m.rows, 50, true);
+  }
 }
-$('lbMore').onclick = () => { $('lbDlg').showModal(); renderLeaderboards(); $('lbFull').innerHTML = lbCache.rows ? lbHTML(lbCache.rows, 50, true) : '<tr><td class="msg">Loading…</td></tr>'; };
+document.querySelectorAll('.lb-seg button').forEach(b => b.onclick = () => {
+  lbMode = b.dataset.lb;
+  try { localStorage.setItem('micube.lbMode', lbMode); } catch (e) { /* ignore */ }
+  renderLeaderboards();
+});
+$('lbMore').onclick = () => { $('lbFull').innerHTML = '<tr><td class="msg">Loading…</td></tr>'; $('lbDlg').showModal(); renderLeaderboards(); };
 $('lbClose').onclick = () => $('lbDlg').close();
 $('lbDlg').addEventListener('click', e => { if (e.target === $('lbDlg')) $('lbDlg').close(); });
 setInterval(() => { if (!document.hidden) renderLeaderboards(true); }, 60000);

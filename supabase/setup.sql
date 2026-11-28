@@ -210,3 +210,12 @@ begin
 end $$;
 revoke all on function public.delete_my_account() from public, anon;
 grant execute on function public.delete_my_account() to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- Fastest-solves leaderboard: best singles below 3 s (faster than the world
+-- record) are refused, so obviously fake times can't top the list.
+-- ---------------------------------------------------------------------------
+alter table public.profiles drop constraint if exists profiles_best_single_sane;
+alter table public.profiles add constraint profiles_best_single_sane
+  check (best_single is null or best_single >= 3000) not valid;
+create index if not exists profiles_best_single_idx on public.profiles (best_single) where best_single is not null;

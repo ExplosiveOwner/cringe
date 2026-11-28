@@ -303,8 +303,8 @@ begin
   if me is null then raise exception 'not signed in'; end if;
   if me = p_opponent then raise exception 'you cannot play yourself'; end if;
   if p_match is null or char_length(p_match) not between 8 and 64 then raise exception 'invalid match id'; end if;
-  if (p_my_time is not null and (p_my_time < 1000 or p_my_time > 3600000))
-     or (p_opp_time is not null and (p_opp_time < 1000 or p_opp_time > 3600000)) then
+  if (p_my_time is not null and (p_my_time < 3000 or p_my_time > 3600000))
+     or (p_opp_time is not null and (p_opp_time < 3000 or p_opp_time > 3600000)) then
     raise exception 'invalid time';
   end if;
   if not exists (select 1 from public.profiles where id = p_opponent) then raise exception 'unknown opponent'; end if;
@@ -389,3 +389,52 @@ delete from public.user_badges b
         or (b.badge = 'sub30' and (p.best_single is null or p.best_single >= 30000))
         or (b.badge = 'sub20' and (p.best_single is null or p.best_single >= 20000))
         or (b.badge = 'sub10' and (p.best_single is null or p.best_single >= 10000)));
+
+-- ===========================================================================
+-- Hardening, round 2 (found by testing attacks on a copy of this database)
+-- ===========================================================================
+
+-- Sign-up no longer fails when the wanted name only differs in capitals from an existing one.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  wanted text := coalesce(new.raw_user_meta_data ->> 'username', '');
+begin
+  if wanted !~ '^[A-Za-z0-9_-]{3,16}$' or not public.username_ok(wanted)
+     or exists (select 1 from public.profiles where lower(username) = lower(wanted)) then
+    wanted := 'cuber_' || substr(replace(new.id::text, '-', ''), 1, 8);
+  end if;
+  insert into public.profiles (id, username) values (new.id, wanted) on conflict (id) do nothing;
+  return new;
+end $$;
+revoke all on function public.handle_new_user() from public, anon, authenticated;
+
+-- Players can never wipe or alter table structure (Supabase grants these by default).
+revoke truncate, references, trigger on public.profiles, public.user_badges, public.matches,
+  public.match_reports, public.feature_requests from anon, authenticated;
+
+-- Feature requests: separate limits, so anonymous spam can't block signed-in players.
+--  * anonymous visitors together: at most 10 per 10 minutes
+--  * each signed-in player: at most 5 per hour
+--  * never more than 5000 stored (read and clear them now and then)
+create or replace function public.limit_feature_requests()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  new.created_at := now();
+  new.user_id := auth.uid();
+  if new.user_id is null then
+    if (select count(*) from public.feature_requests
+         where user_id is null and created_at > now() - interval '10 minutes') >= 10 then
+      raise exception 'too many requests right now, please try again later';
+    end if;
+  elsif (select count(*) from public.feature_requests
+          where user_id = new.user_id and created_at > now() - interval '1 hour') >= 5 then
+    raise exception 'too many requests right now, please try again later';
+  end if;
+  if (select count(*) from public.feature_requests) >= 5000 then
+    raise exception 'too many requests right now, please try again later';
+  end if;
+  return new;
+end $$;
+revoke all on function public.limit_feature_requests() from public, anon, authenticated;
+create index if not exists feature_requests_user_idx on public.feature_requests (user_id, created_at);

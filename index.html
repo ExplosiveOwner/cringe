@@ -3258,6 +3258,9 @@ const wire = m => JSON.parse(JSON.stringify(m));
 const vsSend = m => { if (vs.conn && vs.conn.open) vs.conn.send(wire(m)); };
 const vsNote = t => { $('vsNote').textContent = t; };
 
+// Messages from the other player are untrusted: only accept well-formed scrambles and times.
+const SCRAMBLE_RE = /^\s*([URFDLB]['2]?\s+){0,39}[URFDLB]['2]?\s*$/;
+const okTime = t => (typeof t === 'number' && isFinite(t) && t >= 0 && t < 36e5 ? t : null);
 function vsOnData(m) {
   if (!m || typeof m !== 'object') return;
   if (m.t === 'hi') {
@@ -3272,7 +3275,7 @@ function vsOnData(m) {
     if (vsOppView) vsOppView.show(m.s, prev, moves);
     specSend({ t: 'state', who: 'guest', s: m.s, m: moves });
   }
-  else if (m.t === 'round' && typeof m.scramble === 'string') {
+  else if (m.t === 'round' && typeof m.scramble === 'string' && SCRAMBLE_RE.test(m.scramble)) {
     vs.bo = m.bo === 5 ? 5 : 1; vs.roundNo = Number(m.n) || vs.roundNo + 1;
     vs.ranked = !!m.ranked && !!acct.session && !!vs.oppUid && typeof m.mid === 'string' && m.mid.length <= 64;
     vs.matchId = vs.ranked ? m.mid : null;
@@ -3282,7 +3285,7 @@ function vsOnData(m) {
   else if (m.t === 'ready') { vs.oppReady = !!m.v; specSend({ t: 'ready', who: 'guest', v: !!m.v }); vsMaybeGo(); vsRender(); }
   else if (m.t === 'go') vsGo();
   else if (m.t === 'done') {
-    vs.oppTime = typeof m.time === 'number' ? m.time : null;
+    vs.oppTime = okTime(m.time);
     specSend({ t: 'done', who: 'guest', time: vs.oppTime });
     vsCheckFinish(); vsRender();
   }
@@ -3444,7 +3447,8 @@ function specOnData(m) {
     Object.assign(w, { host: m.host || {}, guest: m.guest || {}, phase: m.phase, scramble: m.scramble || '', score: m.score || [0, 0], bo: m.bo || 1, n: m.n || 0 });
     if (m.phase === 'running' && m.el != null) { w.t0 = performance.now() - m.el; specClock(); }
   } else if (m.t === 'names') {
-    w.host.name = m.host; w.guest.name = m.guest; if (m.gs) w.guest.s = m.gs;
+    w.host.name = String(m.host || '').slice(0, 16); w.guest.name = String(m.guest || '').slice(0, 16);
+    if (typeof m.gs === 'string' && colorCountsOk(m.gs)) w.guest.s = m.gs;
   } else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) {
     const prev = side.s; side.s = m.s;
     const moves = Array.isArray(m.m) && m.m.every(x => typeof x === 'string' && /^[URFDLB]['2]?$/.test(x)) ? m.m : null;
@@ -3452,6 +3456,7 @@ function specOnData(m) {
     if (view) view.show(m.s, prev, moves);
     return;
   } else if (m.t === 'round') {
+    if (typeof m.scramble !== 'string' || !SCRAMBLE_RE.test(m.scramble)) return;
     Object.assign(w, { phase: 'scrambling', scramble: m.scramble, bo: m.bo || 1, n: m.n || w.n + 1 });
     if (m.score) w.score = m.score;
     for (const x of [w.host, w.guest]) { x.ready = false; x.time = undefined; }
@@ -3470,7 +3475,7 @@ function specOnData(m) {
     };
     tick();
   } else if (m.t === 'done') {
-    side.time = typeof m.time === 'number' ? m.time : null;
+    side.time = okTime(m.time);
     if (w.host.time !== undefined && w.guest.time !== undefined) {
       w.phase = 'idle';
       const a = w.host.time, b = w.guest.time;
@@ -4878,7 +4883,7 @@ async function reportRanked(matchId, oppId, me, op) {
   const db = await sb();
   for (let attempt = 0; attempt < 10; attempt++) {
     const { data, error } = await db.rpc('report_match', { p_match: matchId, p_opponent: oppId, p_my_time: me == null ? null : Math.round(me), p_opp_time: op == null ? null : Math.round(op) });
-    if (error) { vsNote(`${$('vsNote').textContent} · ranking failed: ${error.message}`); return; }
+    if (error) { vsNote(`${$('vsNote').textContent} · not ranked: ${/invalid time/.test(error.message) ? 'times under 3 s are not allowed in ranked' : error.message}`); return; }
     if (data.status === 'done') {
       const d = data.delta;
       vsNote(`${$('vsNote').textContent} · MMR ${d >= 0 ? '+' : ''}${d}`);

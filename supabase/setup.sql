@@ -244,9 +244,9 @@ create or replace function public.check_badge()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare p public.profiles%rowtype;
 begin
-  if new.badge not in ('first_solve','guide_solved','sub60','sub30','sub20','sub10','solves100','streak7','turns50',
-                       'cross_opt','beginner_all','pll_all','oll_all','win1','mmr1200') then
-    raise exception 'unknown badge';
+  -- only badges the server can check are stored online; practice badges stay on the player's own device
+  if new.badge not in ('sub60','sub30','sub20','sub10','win1','mmr1200') then
+    raise exception 'this badge is not stored online';
   end if;
   select * into p from public.profiles where id = new.user_id;
   if (new.badge = 'win1' and coalesce(p.wins, 0) < 1)
@@ -378,13 +378,11 @@ revoke all on function public.check_badge() from public, anon, authenticated;
 revoke all on function public.limit_feature_requests() from public, anon, authenticated;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
 
--- Clean-up: remove badges that were added by hand before the check above existed
--- (unknown badge names, and wins / MMR / time badges the profile doesn't back up).
+-- Clean-up: keep only online badges that the profile backs up (practice badges live on the device only).
 delete from public.user_badges b
  using public.profiles p
  where p.id = b.user_id
-   and (b.badge not in ('first_solve','guide_solved','sub60','sub30','sub20','sub10','solves100','streak7','turns50',
-                        'cross_opt','beginner_all','pll_all','oll_all','win1','mmr1200')
+   and (b.badge not in ('sub60','sub30','sub20','sub10','win1','mmr1200')
         or (b.badge = 'win1' and coalesce(p.wins, 0) < 1)
         or (b.badge = 'mmr1200' and coalesce(p.mmr, 0) < 1200)
         or (b.badge = 'sub60' and (p.best_single is null or p.best_single >= 60000))

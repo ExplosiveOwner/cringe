@@ -4646,10 +4646,12 @@ function checkBadges() {
     if (acct.profile.mmr >= 1200) awardBadge('mmr1200');
   }
 }
+// Only badges the server can verify (wins, MMR, best time) are saved online; the rest stay on this device.
+const ONLINE_BADGES = new Set(['sub60', 'sub30', 'sub20', 'sub10', 'win1', 'mmr1200']);
 async function pushBadges() {
   try {
     const db = await sb(), uid = acct.session.user.id;
-    const missing = Object.keys(localBadges).filter(id => !acct.server.has(id) && BADGES.some(b => b.id === id));
+    const missing = Object.keys(localBadges).filter(id => !acct.server.has(id) && ONLINE_BADGES.has(id));
     if (!missing.length) return;
     const { error } = await db.from('user_badges').upsert(missing.map(badge => ({ user_id: uid, badge })), { onConflict: 'user_id,badge', ignoreDuplicates: true });
     if (!error) missing.forEach(id => acct.server.add(id));
@@ -4664,7 +4666,7 @@ async function loadProfile() {
     db.from('user_badges').select('badge').eq('user_id', uid),
   ]);
   acct.profile = prof || null;
-  acct.server = new Set((bdg || []).map(x => x.badge));
+  acct.server = new Set((bdg || []).map(x => x.badge).filter(id => ONLINE_BADGES.has(id)));
   // keep the best single online up to date
   const t = solves.map(effTime).filter(isFinite), best = t.length ? Math.min(...t) : null;
   if (acct.profile && best && (!acct.profile.best_single || best < acct.profile.best_single)) {

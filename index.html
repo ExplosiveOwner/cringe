@@ -5023,11 +5023,11 @@ function learnMethods() {
           goal: [{ s: heldSolved(Y), cap: 'Whole top yellow', top: true, col: ollCol }],
           text: ['Count the yellow corners on top.',
             '<b>One (the fish 🐟)</b>: turn the top so the fish\'s yellow corner is at the front-left — the fish bites your left thumb — and do the Sune.',
-            '<b>None</b>: turn the top until a yellow sticker on the <b>left side</b> sits at the front-left, then do the Sune. You get the fish.',
+            '<b>None</b>: turn the top until a yellow sticker on the <b>left side</b> sits at the front-left — facing your left thumb — then do the Sune. You get the fish.',
             '<b>Two</b>: turn the top until a yellow sticker on the <b>front</b> sits at the front-left, then do the Sune. You get the fish.',
             'Repeat with the fish until the whole top is yellow.'],
           algs: [ll('Fish', SUNE_ALG, 'bites your left thumb', '', ollCol),
-            ll('No corners', SUNE_ALG, 'yellow on the left side → fish', '', ollCol, applyMoves(heldSolved(Y), invertAlg("R U2 R2 U' R2 U' R2 U2 R"))),
+            ll('No corners', SUNE_ALG, 'yellow facing your left thumb → fish', '', ollCol, applyMoves(heldSolved(Y), invertAlg("R U2 R2 U' R2 U' R2 U2 R"))),
             ll('Two corners', SUNE_ALG, 'yellow on the front → fish', '', ollCol, applyMoves(heldSolved(Y), invertAlg("r U R' U' r' F R F'")))] },
         { title: 'Yellow corners (headlights)', hold: 'Yellow on top',
           goal: [{ s: heldSolved(Y), keep: (l, e) => !e, cap: 'Top corners in place: every side shows matching corners', top: true }],
@@ -5104,7 +5104,7 @@ function whiteFishCards() {
       if (k === 0 && x[44] === 'D' && !none) none = x;
       if (k === 2 && x[24] === 'D' && !two) two = x;
     }
-  return [card('Fish', 'bites your left thumb', learnSetup('', A)), card('No corners', 'yellow on the left side → fish', none), card('Two corners', 'yellow on the front → fish', two)];
+  return [card('Fish', 'bites your left thumb', learnSetup('', A)), card('No corners', 'yellow facing your left thumb → fish', none), card('Two corners', 'yellow on the front → fish', two)];
 }
 
 /* Classic last layer: yellow edges (Sune), place the corners, twist them with R' D' R D. */
@@ -5159,7 +5159,7 @@ function whiteOnTopLL(steps) {
       'Dot: just do the algorithm — you get an L, then a line, then the cross.'],
     ['Count the yellow corners on the bottom (yellow facing down).',
       '<b>One (the fish 🐟)</b>: turn the bottom so the fish\'s yellow corner is at the <b>front-left</b> — the fish bites your left thumb — and do <b>R\' D\' R D\' R\' D2 R</b>.',
-      '<b>None</b>: turn the bottom until a yellow sticker on the <b>left side</b> sits at the front-left, then do the algorithm. You get the fish.',
+      '<b>None</b>: turn the bottom until a yellow sticker on the <b>left side</b> sits at the front-left — facing your left thumb — then do the algorithm. You get the fish.',
       '<b>Two</b>: turn the bottom until a yellow sticker on the <b>front</b> sits at the front-left, then do the algorithm. You get the fish.',
       'Repeat with the fish until the whole bottom is yellow.'],
     ['Look for “headlights”: two bottom corners on one side with the same colour.',
@@ -5170,7 +5170,7 @@ function whiteOnTopLL(steps) {
       'Pick the U-perm for the way the front edge has to go. (M turns the middle layer like L.)',
       'No matching side? Do either U-perm once, then you have one. Finish with a bottom turn if needed.'],
   ];
-  const SUBS = { 'bites your left thumb': 'bites your right thumb', 'yellow on the left side → fish': 'yellow on the right side → fish', 'yellow on the front → fish': 'yellow on the front → fish',
+  const SUBS = { 'bites your left thumb': 'bites your right thumb', 'yellow facing your left thumb → fish': 'yellow on the right side → fish', 'yellow on the front → fish': 'yellow on the front → fish',
     'at the back-left → line': 'at the back-right → line', 'keeps the left corners': 'keeps the right corners' };
   const NAMES = { 'U-perm (edges go left)': 'U-perm (edges go right)', 'U-perm (edges go right)': 'U-perm (edges go left)', 'Headlights on the left': 'Headlights on the right' };
   for (let k = 0; k < 4; k++) {

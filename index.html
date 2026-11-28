@@ -742,7 +742,8 @@
       <p class="msg" id="learnIntro" style="margin-top:0"></p>
       <label class="chk" id="learnGripWrap" style="margin:-4px 0 10px">After the flower, hold
         <select id="learnGrip"><option value="white">white on top</option><option value="yellow">yellow on top</option></select>
-        <span class="msg" style="margin:0">(same setting as the Guide tab)</span></label>
+        · last layer <select id="learnLL"><option value="fish">Fish (Rubik's guide)</option><option value="classic">Twist corners</option></select>
+        <span class="msg" style="margin:0">(same settings as the Guide tab)</span></label>
       <div class="learn-steps" id="learnSteps"></div>
       <div class="learn-body">
         <div class="learn-main">
@@ -1379,7 +1380,8 @@ const BEGINNER_DATA = [
   { id: 'b-ycross', name: 'Yellow cross', nick: '', subset: 'step 5 · yellow cross', algs: ["F R U R' U' F'"] },
   { id: 'b-yedges', name: 'Yellow edges', nick: 'Sune', subset: 'step 6 · yellow edges', algs: ["R U R' U R U2 R'"] },
   { id: 'b-ycorners', name: 'Place yellow corners', nick: '', subset: 'step 7 · place corners', algs: ["U R U' L' U R' U' L"] },
-  { id: 'b-fish', name: 'Yellow face', nick: 'fish (Sune)', subset: 'step 6 · fish method', algs: ["R U R' U R U2 R'"] },
+  { id: 'b-fish', name: 'Yellow face', nick: 'fish (Sune)', subset: 'step 6 · fish method', algs: ["R U R' U R U2 R'"],
+    white: { id: 'b-fish-w', nick: 'fish', algs: ["L' U' L U' L' U2 L"] } },
   { id: 'b-headlights', name: 'Yellow corners', nick: 'headlights', subset: 'step 7 · fish method', algs: ["R' F R' B2 R F' R' B2 R2"] },
   { id: 'b-uperm', name: 'Yellow edges', nick: 'U-perm', subset: 'step 8 · fish method', algs: ["M2 U M U2 M' U M2"] },
   { id: 'b-uperm-2', name: 'Yellow edges', nick: 'U-perm, other way', subset: 'step 8 · fish method', algs: ["M2 U' M U2 M' U' M2", "F2 U L R' F2 L' R U F2"] },
@@ -2265,7 +2267,7 @@ function beginnerPlan(cubeState, grip = 'yellow', ll = begLL) {
       text: T(`You have ${shape} of yellow on top. Turn the top as shown, then do the algorithm.`,
         `You have ${shape} of yellow on the bottom. Turn the bottom as shown, then do the algorithm.`) };
   }
-  if (ll === 'fish') return fishPlan(st, T);
+  if (ll === 'fish') return fishPlan(st, T, grip);
   if (edgesMatched(st) < 4) {
     const cands = [];
     for (let j = 1; j < 4; j++) cands.push(UK[j]);
@@ -2298,21 +2300,25 @@ function beginnerPlan(cubeState, grip = 'yellow', ll = begLL) {
  * headlights algorithm, step 8: edges with the U-perm (and a final top turn). */
 const topYellow = st => [0, 1, 2, 3, 5, 6, 7, 8].every(i => st[i] === 'U');
 const cornersOkAUF = st => AUF.some(a => { const t = a ? falg(st, a) : st; return U_CORNERS.every(c => pieceSolved(t, c)); });
-function fishPlan(st, T) {
+// With white on top the fish is done with R' D' R D' R' D2 R (written here in the yellow-up frame), so it
+// still bites your left thumb; with yellow on top it's the Sune.
+const SUNE_WHITE = "L' U' L U' L' U2 L";
+function fishPlan(st, T, grip) {
+  const S = grip === 'white' ? SUNE_WHITE : SUNE, spot = grip === 'white' ? 8 : 6;
   if (!topYellow(st)) {
     const oriented = [0, 2, 6, 8].filter(i => st[i] === 'U');
     let first = null;
     if (oriented.length === 1) {
       // the fish: its yellow corner goes to the front-left (it bites your left thumb), then the Sune
-      const k = [0, 1, 2, 3].find(n => falg(st, UK[n])[6] === 'U');
-      first = normAlg(`${UK[k]} ${SUNE}`);
+      const k = [0, 1, 2, 3].find(n => falg(st, UK[n])[spot] === 'U');
+      first = normAlg(`${UK[k]} ${S}`);
     } else {
       // no fish yet: pick the angle that gets the yellow face done with the fewest Sunes
       for (let d = 1; d <= 3 && !first; d++) {
         const walk = (t, depth, path) => {
           if (depth === 0) return twoLayers(t) && topYellow(t) ? path : null;
           for (let k = 0; k < 4; k++) {
-            const seg = normAlg(`${UK[k]} ${SUNE}`);
+            const seg = normAlg(`${UK[k]} ${S}`);
             const r = walk(falg(t, seg), depth - 1, path.concat(seg));
             if (r) return r;
           }
@@ -2321,7 +2327,7 @@ function fishPlan(st, T) {
         const r = walk(st, d, []);
         if (r) first = r[0];
       }
-      first = first || SUNE;
+      first = first || S;
     }
     const k = UK.indexOf(splitAlg(first)[0]);
     const text = oriented.length === 1
@@ -2329,7 +2335,7 @@ function fishPlan(st, T) {
           'You have the fish 🐟 (one yellow corner on the bottom). Turn the bottom so the fish bites your left thumb as shown, then do the algorithm. Repeat until the whole yellow side is done.')
       : T(`${oriented.length === 0 ? 'No' : 'Two'} yellow corners on top yet. Turn the top as shown and do the Sune — that makes the fish.`,
           `${oriented.length === 0 ? 'No' : 'Two'} yellow corners on the bottom yet. Turn the bottom as shown and do the algorithm — that makes the fish.`);
-    return { stage: 6, title: 'Step 6 · Yellow face (fish)', moves: splitAlg(first), alg: `${k > 0 ? UK[k] + ' then ' : ''}${SUNE}`, text };
+    return { stage: 6, title: 'Step 6 · Yellow face (fish)', moves: splitAlg(first), alg: `${k > 0 ? UK[k] + ' then ' : ''}${S}`, text };
   }
   if (!cornersOkAUF(st)) {
     const cands = [];
@@ -4616,14 +4622,37 @@ const sfx = {
     if (this.ctx.state === 'suspended') this.ctx.resume();
     return this.ctx;
   },
+  /** Turn sound: a clicky mechanical keyboard switch — sharp actuation click, bottom-out clack, soft release tick. */
   click() {
     if (!prefs.clicks) return;
     const ac = this.ac(); if (!ac) return;
-    const n = Math.floor(ac.sampleRate * 0.025), buf = ac.createBuffer(1, n, ac.sampleRate), d = buf.getChannelData(0);
-    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 4);
-    const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
-    src.buffer = buf; f.type = 'bandpass'; f.frequency.value = 2200 + Math.random() * 600; f.Q.value = 1.4; g.gain.value = 0.5;
-    src.connect(f).connect(g).connect(ac.destination); src.start();
+    if (!this.noise) {   // one shared burst of white noise
+      const n = Math.floor(ac.sampleRate * 0.06); this.noise = ac.createBuffer(1, n, ac.sampleRate);
+      const d = this.noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+    }
+    const t0 = ac.currentTime + 0.002, jit = (a, b) => a + Math.random() * (b - a);
+    const out = ac.createGain(); out.gain.value = 0.9; out.connect(ac.destination);
+    const burst = (t, dur, type, freq, q, vol) => {      // filtered noise with a fast decay
+      const src = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+      src.buffer = this.noise; f.type = type; f.frequency.value = freq; f.Q.value = q;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(f).connect(g).connect(out); src.start(t, Math.random() * 0.02); src.stop(t + dur + 0.01);
+    };
+    const pip = (t, freq, dur, vol, type = 'sine') => {   // a short pitched ping / thump
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 0.7, t + dur);
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g).connect(out); o.start(t); o.stop(t + dur + 0.01);
+    };
+    // 1. the click: a bright, very short snap
+    burst(t0, 0.006, 'highpass', jit(3200, 4200), 0.8, 0.55);
+    pip(t0, jit(4200, 5200), 0.007, 0.12, 'triangle');
+    // 2. bottom-out ~10 ms later: the plastic "clack" plus a little body thump
+    const tb = t0 + jit(0.008, 0.013);
+    burst(tb, 0.035, 'bandpass', jit(1300, 1900), 2.2, 0.45);
+    pip(tb, jit(210, 280), 0.045, 0.22);
+    // 3. a quiet release tick as the key comes back up
+    burst(tb + jit(0.055, 0.075), 0.012, 'bandpass', jit(2400, 3000), 2, 0.12);
   },
   tone(freqs, { dur = 0.22, type = 'sine', vol = 0.12, gap = 0.08 } = {}) {
     if (!prefs.effects) return;
@@ -4996,8 +5025,10 @@ function learnMethods() {
           goal: [{ s: heldSolved(Y), keep: (l, e) => !e, cap: 'Top corners in place: every side shows matching corners', top: true }],
           text: ['Look for “headlights”: two corners on one side with the same colour.',
             'Turn the top so the headlights are at the <b>back</b>, then do the algorithm.',
+            'Or keep the headlights on the <b>left</b> and use the other algorithm. It also moves some edges around, but step 8 fixes those.',
             'No headlights anywhere? Do it once from any side — then you\'ll have them.'],
           algs: [ll('Headlights at the back', APERM_ALG, 'swaps the other corners'),
+            ll('Headlights on the left', HEADLIGHTS_LEFT, 'keeps the left corners'),
             ll('No headlights', APERM_ALG, 'from any side → headlights', invertAlg(APERM_ALG) + " U'")] },
         { title: 'Yellow edges', hold: 'Yellow on top',
           goal: [{ s: heldSolved(Y), cap: 'Solved! 🎉', top: true }],
@@ -5049,8 +5080,65 @@ function learnMethods() {
             ll('H', "M2 U M2 U2 M2 U M2", 'opposites swap'), ll('Z', "M' U M2 U M2 U M' U2 M2", 'neighbours swap')] },
       ] },
   };
+  if (begLL === 'classic') M.beginner.steps.splice(5, 3, ...classicLL(ll, Y));
   if (wg) whiteOnTopLL(M.beginner.steps);
   return M;
+}
+
+/* White on top: the fish algorithm is R' D' R D' R' D2 R (fish at the front-left, it bites your left thumb). */
+function whiteFishCards() {
+  const A = "R' D' R D' R' D2 R", card = (name, sub, state) => ({ name, sub, alg: A, state, view: 'bottom', bottom: true, col: 'yellow' });
+  let none = null, two = null;
+  for (const a of ["R U2 R2 U' R2 U' R2 U2 R", "R U R' U R U' R' U R U2 R'", "r U R' U' r' F R F'", "R2 D R' U2 R D' R' U2 R'", "F' r U R' U' r' F R"])
+    for (const auf of ['', 'D', 'D2', "D'"]) {
+      let x = applyMoves(applyMoves(heldSolved('z2'), invertAlg(a)), 'z2'); if (auf) x = applyMoves(x, auf);
+      const k = [27, 29, 33, 35].filter(i => x[i] === 'D').length;
+      if (k === 0 && x[44] === 'D' && !none) none = x;
+      if (k === 2 && x[24] === 'D' && !two) two = x;
+    }
+  return [card('Fish', 'bites your left thumb', learnSetup('', A)), card('No corners', 'yellow on the left side → fish', none), card('Two corners', 'yellow on the front → fish', two)];
+}
+
+/* Classic last layer: yellow edges (Sune), place the corners, twist them with R' D' R D. */
+const NIKLAS_ALG = "U R U' L' U R' U' L", PLACE_OTHER = "L' U R U' L U R' U'", HEADLIGHTS_LEFT = "L' U R U' L U2 R' U R U2 R'";
+function classicLL(ll, Y) {
+  const twistY = `${repAlg("R' D' R D", 2)} U ${repAlg("R' D' R D", 4)} U'`, twistW = `${repAlg("R U R' U'", 2)} D ${repAlg("R U R' U'", 4)} D'`;
+  return [
+    { title: 'Yellow edges', hold: 'Yellow on top',
+      goal: [{ s: heldSolved(Y), keep: (l, e) => e, cap: 'Yellow edges match their side centres', top: true }],
+      text: ['Turn the top until two <b>neighbouring</b> yellow edges match their side centres.',
+        'Hold those two at the <b>back</b> and on the <b>right</b>, do the Sune, then turn the top once (U).',
+        'Only two opposite edges match? Do the Sune once from anywhere — then you get neighbours.'],
+      wtext: ['Turn the bottom until two <b>neighbouring</b> yellow edges match their side centres.',
+        'Hold those two at the <b>back</b> and on the <b>left</b>, do the algorithm, then turn the bottom once (D).',
+        'Only two opposite edges match? Do the algorithm once from anywhere — then you get neighbours.'],
+      wnames: { 'Matching at the back and right': 'Matching at the back and left' },
+      algs: [ll('Matching at the back and right', SUNE_ALG + ' U', 'Sune, then U')] },
+    { title: 'Place yellow corners', hold: 'Yellow on top',
+      goal: [{ s: heldSolved(Y), keep: (l, e) => !e, cap: 'Every corner in its own spot (twists come next)', top: true }],
+      text: ['Find a corner in its <b>right spot</b>: its three colours match the three sides around it. It may still be twisted.',
+        'Hold it at the <b>front-right</b> and do an algorithm. Repeat until all four corners are in place.',
+        'Both algorithms keep the front-right corner and move the other three round — in opposite directions. Pick the one that takes them home.',
+        'No corner in its spot? Do either one once from anywhere, then one will be.'],
+      wtext: ['Find a corner in its <b>right spot</b>: its three colours match the three sides around it. It may still be twisted.',
+        'Hold it at the <b>front-left</b> of the bottom and do an algorithm. Repeat until all four corners are in place.',
+        'Both algorithms keep the front-left corner and move the other three round — in opposite directions. Pick the one that takes them home.',
+        'No corner in its spot? Do either one once from anywhere, then one will be.'],
+      wsubs: { 'keeps the front-right corner': 'keeps the front-left corner' },
+      algs: [ll('Corners round one way', NIKLAS_ALG, 'keeps the front-right corner'), ll('Corners round the other way', PLACE_OTHER, 'keeps the front-right corner')] },
+    { title: 'Twist yellow corners', hold: 'Yellow on top',
+      goal: [{ s: heldSolved(Y), cap: 'Solved! 🎉', top: true }],
+      text: ['Hold a twisted corner at the <b>front-right</b> of the top.',
+        'Repeat <b>R\' D\' R D</b> until its yellow faces up (2 or 4 times). The white side gets messy — that\'s normal, keep going.',
+        'Turn only the top (U) to bring the next twisted corner to the front-right and repeat. Never turn the whole cube.',
+        'When all the yellow faces up, turn the top to finish — the white side fixes itself.'],
+      wtext: ['Hold a twisted corner at the <b>front-right</b> of the bottom.',
+        'Repeat <b>R U R\' U\'</b> until its yellow faces down (2 or 4 times). The white side gets messy — that\'s normal, keep going.',
+        'Turn only the bottom (D) to bring the next twisted corner to the front-right and repeat. Never turn the whole cube.',
+        'When all the yellow faces down, turn the bottom to finish — the white side fixes itself.'],
+      algs: [ll('Two twisted corners', twistY, "R' D' R D × 2, U, × 4, U'")],
+      walgs: [{ name: 'Two twisted corners', alg: twistW, sub: "R U R' U' × 2, D, × 4, D'", state: learnSetup('', twistW), view: 'bottom', bottom: true }] },
+  ];
 }
 
 /* With white on top for the whole solve, the last layer is on the bottom: same cases turned over (z2),
@@ -5062,27 +5150,30 @@ function whiteOnTopLL(steps) {
       'Line: hold it <b>left-to-right</b>. L: hold it at the <b>back-right</b>. Then do the algorithm.',
       'Dot: just do the algorithm — you get an L, then a line, then the cross.'],
     ['Count the yellow corners on the bottom (yellow facing down).',
-      '<b>One (the fish 🐟)</b>: turn the bottom so the fish\'s yellow corner is at the <b>front-right</b> — with white on top the fish bites your <b>right</b> thumb — and do the algorithm.',
-      '<b>None</b>: turn the bottom until a yellow sticker on the <b>right side</b> sits at the front-right, then do the algorithm. You get the fish.',
-      '<b>Two</b>: turn the bottom until a yellow sticker on the <b>front</b> sits at the front-right, then do the algorithm. You get the fish.',
+      '<b>One (the fish 🐟)</b>: turn the bottom so the fish\'s yellow corner is at the <b>front-left</b> — the fish bites your left thumb — and do <b>R\' D\' R D\' R\' D2 R</b>.',
+      '<b>None</b>: turn the bottom until a yellow sticker on the <b>left side</b> sits at the front-left, then do the algorithm. You get the fish.',
+      '<b>Two</b>: turn the bottom until a yellow sticker on the <b>front</b> sits at the front-left, then do the algorithm. You get the fish.',
       'Repeat with the fish until the whole bottom is yellow.'],
     ['Look for “headlights”: two bottom corners on one side with the same colour.',
       'Turn the bottom so the headlights are at the <b>back</b>, then do the algorithm.',
+      'Or keep the headlights on the <b>right</b> and use the other algorithm. It also moves some edges around, but step 8 fixes those.',
       'No headlights anywhere? Do it once from any side — then you\'ll have them.'],
     ['Find a side whose bottom edge already matches its corners, and turn the bottom to put that side at the <b>back</b>.',
       'Pick the U-perm for the way the front edge has to go. (M turns the middle layer like L.)',
       'No matching side? Do either U-perm once, then you have one. Finish with a bottom turn if needed.'],
   ];
   const SUBS = { 'bites your left thumb': 'bites your right thumb', 'yellow on the left side → fish': 'yellow on the right side → fish', 'yellow on the front → fish': 'yellow on the front → fish',
-    'at the back-left → line': 'at the back-right → line' };
-  const NAMES = { 'U-perm (edges go left)': 'U-perm (edges go right)', 'U-perm (edges go right)': 'U-perm (edges go left)' };
+    'at the back-left → line': 'at the back-right → line', 'keeps the left corners': 'keeps the right corners' };
+  const NAMES = { 'U-perm (edges go left)': 'U-perm (edges go right)', 'U-perm (edges go right)': 'U-perm (edges go left)', 'Headlights on the left': 'Headlights on the right' };
   for (let k = 0; k < 4; k++) {
     const st = steps[4 + k];
     st.hold = 'White on top';
     st.tip = k === 0 ? 'Keep white on top: the last layer is solved on the <b>bottom</b>. Tip: look at the demo cube from below, or lift your cube to check the yellow side.' : '';
-    st.text = TXT[k];
+    st.text = st.wtext || TXT[k];
     st.goal = st.goal.map(g => ({ ...turn(g), cap: g.cap.replace('on top', 'on the bottom').replace('Whole top', 'Whole bottom').replace('Top corners', 'Bottom corners') + ' — seen from below, front edge at the top' }));
-    st.algs = st.algs.map(a => ({ ...turn(a), name: NAMES[a.name] || a.name, sub: SUBS[a.sub] || a.sub }));
+    const names = { ...NAMES, ...(st.wnames || {}) }, subs = { ...SUBS, ...(st.wsubs || {}) };
+    if (st.title.includes('fish')) st.walgs = whiteFishCards();
+    st.algs = st.walgs || st.algs.map(a => ({ ...turn(a), name: names[a.name] || a.name, sub: subs[a.sub] || a.sub }));
   }
 }
 
@@ -5115,7 +5206,7 @@ function renderLearn() {
   document.querySelectorAll('#learnMethod button').forEach(b => b.classList.toggle('active', b.dataset.lm === method));
   $('learnIntro').textContent = data.intro;
   $('learnGripWrap').classList.toggle('hidden', method !== 'beginner');
-  $('learnGrip').value = begGrip;
+  $('learnGrip').value = begGrip; $('learnLL').value = begLL;
   $('learnSteps').innerHTML = data.steps.map((x, i) => `<button data-ls="${i}" class="${i === learn.step ? 'on' : ''} ${learn.seen[method][i] ? 'seen' : ''}">${i + 1}. ${x.title}</button>`).join('');
   $('learnTitle').textContent = `Step ${learn.step + 1} · ${st.title}`;
   $('learnHold').textContent = '✋ ' + st.hold + (st.hold.includes('top') && !st.hold.includes('green') ? ', green in front' : '');
@@ -5212,6 +5303,7 @@ $('learnAlgs').addEventListener('click', e => {
   }
 });
 $('learnGrip').onchange = e => { $('bGrip').value = e.target.value; $('bGrip').onchange({ target: $('bGrip') }); renderLearn(); };
+$('learnLL').onchange = e => { $('bLL').value = e.target.value; $('bLL').onchange({ target: $('bLL') }); renderLearn(); };
 $('learnPlay').onclick = learnPlay;
 $('learnRestart').onclick = () => { learnStop(); learnGo(0); };
 $('learnBack').onclick = () => { learnStop(); if (learn.demo) learnGo(learn.demo.i - 1); };

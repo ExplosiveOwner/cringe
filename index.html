@@ -330,6 +330,14 @@
   .badge.locked { opacity: .38; filter: grayscale(1); }
   #leaderboard tr.me td { color: var(--accent); font-weight: 700; }
   #leaderboard th:nth-child(2), #leaderboard td:nth-child(2) { text-align: left; }
+  .lb-card { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .lb-table { margin-top: 6px; }
+  .lb-table td, .lb-table th { padding: 5px 6px; }
+  .lb-table th:nth-child(2), .lb-table td:nth-child(2) { text-align: left; }
+  .lb-table tr.me td { color: var(--accent); font-weight: 700; }
+  .lb-table .rank { width: 2.2em; color: var(--muted); }
+  .lb-table tr:nth-child(2) .rank, .lb-table tr:nth-child(3) .rank, .lb-table tr:nth-child(4) .rank { font-size: 16px; }
+  @media (max-width: 700px) { #lbMini tr:nth-child(n+7):not(.me) { display: none; } }
   @media (max-width: 700px) { .acct-chip #acctLabel { max-width: 90px; } #btnAccount { position: absolute; top: 8px; right: 54px; } }
   .credits { padding-left: 18px; line-height: 1.6; }
   .site-foot { max-width: 1480px; margin: 0 auto; padding: 8px 20px 28px; display: flex; flex-wrap: wrap; gap: 10px;
@@ -466,6 +474,13 @@
       <div class="net" id="net"></div>
     </div>
 
+    <div class="lb-card" id="lbCard">
+      <div class="row" style="justify-content:space-between">
+        <h3 style="margin:0">🏆 Leaderboard</h3>
+        <button id="lbMore">View all</button>
+      </div>
+      <table class="lb-table" id="lbMini"><tr><td class="msg">Loading…</td></tr></table>
+    </div>
     <div class="replay hidden" id="replayBar">
       <div class="row" style="justify-content:space-between">
         <strong id="replayTitle">Replay</strong>
@@ -856,6 +871,7 @@
         <input id="acctUser" maxlength="16" placeholder="Username (3–16 letters, digits, _ or -)" autocomplete="username" class="hidden">
         <input id="acctEmail" type="email" placeholder="E-mail" autocomplete="email">
         <input id="acctPass" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
+        <div id="captchaBox"></div>
         <button class="primary" id="acctGo">Sign in</button>
         <div class="msg" id="acctMsg"></div>
       </div>
@@ -884,6 +900,13 @@
         <button id="acctOutBtn" class="danger">Sign out</button>
       </div>
     </div>
+  </div>
+</dialog>
+<dialog class="sheet" id="lbDlg">
+  <div class="sheet-head"><h2>🏆 Leaderboard</h2><button class="icon-btn" id="lbClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <p class="msg" style="margin-top:10px">Ranked 1v1 players with at least 3 ranked rounds, by MMR.</p>
+    <div class="tbl-wrap"><table class="lb-table" id="lbFull"></table></div>
   </div>
 </dialog>
 <dialog class="sheet" id="featureDlg">
@@ -4518,6 +4541,9 @@ const SUPABASE_URL = (window.SMARTCUBE_SUPABASE || {}).url || 'https://wweouoczr
 const SUPABASE_KEY = (window.SMARTCUBE_SUPABASE || {}).key || 'sb_publishable_tJudQZkuib60xIuRPifbsQ_DAVC5Ohu';
 const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js';
 const SUPPORT_URL = 'https://ko-fi.com/explosiveowner';
+// Cloudflare Turnstile (CAPTCHA) site key — public. The secret half lives in Supabase (Attack Protection).
+const TURNSTILE_SITEKEY = (window.SMARTCUBE_SUPABASE || {}).turnstile || '';
+const TURNSTILE_JS = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let sbClient = null;
 const onlineReady = () => !!(SUPABASE_URL && SUPABASE_KEY);
 async function sb() {
@@ -4617,6 +4643,47 @@ function renderAcctChip() {
   $('acctLabel').textContent = pf ? `${pf.username} · ${pf.mmr}` : 'Sign in';
 }
 
+/* Leaderboard: players with at least 3 ranked rounds (brand-new or fake accounts never show up). */
+let lbCache = { at: 0, rows: null, err: null };
+async function fetchLeaderboard(force) {
+  if (!force && lbCache.rows && Date.now() - lbCache.at < 30000) return lbCache;
+  try {
+    const db = await sb();
+    const { data, error } = await db.from('profiles').select('id, username, avatar, mmr, wins, losses').gte('games', 3)
+      .order('mmr', { ascending: false }).order('wins', { ascending: false }).limit(50);
+    if (error) throw error;
+    lbCache = { at: Date.now(), rows: data || [], err: null };
+  } catch (e) { lbCache = { at: Date.now(), rows: lbCache.rows, err: e.message || String(e) }; }
+  return lbCache;
+}
+function lbHTML(rows, limit, wl) {
+  const pf = acct.profile, medal = i => ['🥇', '🥈', '🥉'][i] || i + 1;
+  const list = rows.slice(0, limit);
+  let html = `<tr><th class="rank">#</th><th>Player</th><th>MMR</th>${wl ? '<th>W / L</th>' : ''}</tr>` + (list.length
+    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${r.mmr}</td>${wl ? `<td>${r.wins} / ${r.losses}</td>` : ''}</tr>`).join('')
+    : `<tr><td colspan="${wl ? 4 : 3}" class="msg">No ranked players yet — win ranked 1v1 rounds to be the first!</td></tr>`);
+  if (pf) {
+    const at = rows.findIndex(r => r.id === pf.id);
+    if (at < 0 || at >= limit) {
+      const left = Math.max(0, 3 - pf.wins - pf.losses);
+      html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${pf.avatar} ${escapeHtml(pf.username)}</td><td>${pf.mmr}</td>${wl ? `<td>${left ? `${left} more ranked to be listed` : `${pf.wins} / ${pf.losses}`}</td>` : ''}</tr>`;
+    }
+  }
+  return html;
+}
+async function renderLeaderboards(force) {
+  if (!onlineReady()) { $('lbCard').classList.add('hidden'); return; }
+  const { rows, err } = await fetchLeaderboard(force);
+  if (!rows) { $('lbMini').innerHTML = `<tr><td class="msg">Leaderboard unavailable${err ? ': ' + escapeHtml(err) : ''}</td></tr>`; return; }
+  $('lbMini').innerHTML = lbHTML(rows, 10, false);
+  if ($('lbDlg').open) $('lbFull').innerHTML = lbHTML(rows, 50, true);
+  if ($('accountDlg').open && acct.session) $('leaderboard').innerHTML = lbHTML(rows, 50, true);
+}
+$('lbMore').onclick = () => { $('lbDlg').showModal(); renderLeaderboards(); $('lbFull').innerHTML = lbCache.rows ? lbHTML(lbCache.rows, 50, true) : '<tr><td class="msg">Loading…</td></tr>'; };
+$('lbClose').onclick = () => $('lbDlg').close();
+$('lbDlg').addEventListener('click', e => { if (e.target === $('lbDlg')) $('lbDlg').close(); });
+setInterval(() => { if (!document.hidden) renderLeaderboards(true); }, 60000);
+
 async function renderAccount() {
   const inside = !!acct.session;
   $('acctOut').classList.toggle('hidden', inside);
@@ -4637,18 +4704,35 @@ async function renderAccount() {
   }
   try {
     const db = await sb();
-    const { data } = await db.from('profiles').select('id, username, avatar, mmr, wins, losses').order('mmr', { ascending: false }).order('wins', { ascending: false }).limit(50);
-    const rows = data || [];
-    $('leaderboard').innerHTML = '<tr><th>#</th><th>Player</th><th>MMR</th><th>W / L</th></tr>' + (rows.length
-      ? rows.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td>${i + 1}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${r.mmr}</td><td>${r.wins} / ${r.losses}</td></tr>`).join('')
-      : '<tr><td colspan="4" class="msg">No players yet.</td></tr>');
+    const { rows, err } = await fetchLeaderboard();
+    if (!rows) throw new Error(err || 'unavailable');
+    $('leaderboard').innerHTML = lbHTML(rows, 50, true);
   } catch (e) { $('leaderboard').innerHTML = `<tr><td class="msg">Leaderboard unavailable: ${escapeHtml(e.message)}</td></tr>`; }
 }
 const escapeHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
+/* CAPTCHA: one fresh token per sign-in / sign-up attempt. */
+let captchaWidget = null;
+async function ensureCaptcha() {
+  if (!TURNSTILE_SITEKEY || captchaWidget !== null) return;
+  try {
+    if (!window.turnstile) await loadScript(TURNSTILE_JS);
+    captchaWidget = turnstile.render('#captchaBox', {
+      sitekey: TURNSTILE_SITEKEY, theme: prefs.theme === 'light' ? 'light' : 'dark',
+      callback: t => { acct.captcha = t; }, 'expired-callback': () => { acct.captcha = null; }, 'error-callback': () => { acct.captcha = null; },
+    });
+  } catch (e) { $('acctMsg').textContent = 'The robot check could not load — check your connection.'; }
+}
+function resetCaptcha() { acct.captcha = null; try { if (window.turnstile && captchaWidget !== null) turnstile.reset(captchaWidget); } catch (e) { /* ignore */ } }
+/** Usernames: obvious abuse is refused (the database checks the same list). */
+const usernameOk = n => !/(fuck|shit|cunt|nigg|faggot|hitler|nazi|porn|kanker|hoer|bitch|whore|slut)/i.test(n);
+
 async function acctSubmit() {
   const email = $('acctEmail').value.trim(), password = $('acctPass').value, username = $('acctUser').value.trim();
   const msg = t => { $('acctMsg').textContent = t; };
+  if (acct.mode === 'up' && !usernameOk(username)) return msg('Please choose a different username.');
+  if (TURNSTILE_SITEKEY && !acct.captcha) return msg('Please complete the robot check first.');
+  const captchaToken = acct.captcha || undefined;
   if (!/^\S+@\S+\.\S+$/.test(email)) return msg('Enter a valid e-mail address.');
   if (password.length < 6) return msg('The password needs at least 6 characters.');
   if (acct.mode === 'up' && !/^[A-Za-z0-9_-]{3,16}$/.test(username)) return msg('Username: 3–16 letters, digits, _ or -.');
@@ -4658,17 +4742,17 @@ async function acctSubmit() {
     if (acct.mode === 'up') {
       const { data: taken } = await db.from('profiles').select('id').eq('username', username).maybeSingle();
       if (taken) throw new Error('That username is taken — pick another one.');
-      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
+      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username }, captchaToken } });
       if (error) throw error;
       if (!data.session) { msg('Account created — check your e-mail to confirm it, then sign in.'); return; }
     } else {
-      const { error } = await db.auth.signInWithPassword({ email, password });
+      const { error } = await db.auth.signInWithPassword({ email, password, options: { captchaToken } });
       if (error) throw error;
     }
     $('acctPass').value = ''; msg('');
   } catch (e) {
-    msg(/invalid login/i.test(e.message || '') ? 'Wrong e-mail or password.' : (e.message || String(e)));
-  } finally { $('acctGo').disabled = false; }
+    msg(/invalid login/i.test(e.message || '') ? 'Wrong e-mail or password.' : /captcha/i.test(e.message || '') ? 'The robot check failed — please try again.' : (e.message || String(e)));
+  } finally { $('acctGo').disabled = false; resetCaptcha(); }
 }
 
 async function acctInit() {
@@ -4679,7 +4763,7 @@ async function acctInit() {
       acct.session = session;
       setTimeout(async () => {
         try { await loadProfile(); } catch (e) { log('Profile: ' + e.message); }
-        renderAcctChip(); checkBadges();
+        renderAcctChip(); checkBadges(); renderLeaderboards(true);
         if ($('accountDlg').open) renderAccount();
         if (mode === 'vs') { if (vs.conn && vs.conn.open && !vs.bot && !vs.watch) vsSend({ t: 'hi', role: 'player', name: vsName(), s: current, uid: session ? session.user.id : null }); vsRender(); }
         if (event === 'SIGNED_IN' && acct.profile && $('accountDlg').open) toast(`Welcome, ${acct.profile.username}! ${acct.profile.avatar}`);
@@ -4688,7 +4772,7 @@ async function acctInit() {
   } catch (e) { log('Accounts unavailable: ' + e.message); }
 }
 
-$('btnAccount').onclick = () => { $('accountDlg').showModal(); renderAccount(); if (!onlineReady()) $('acctMsg').textContent = 'Online accounts are not set up yet.'; };
+$('btnAccount').onclick = () => { $('accountDlg').showModal(); renderAccount(); if (!onlineReady()) $('acctMsg').textContent = 'Online accounts are not set up yet.'; else if (!acct.session) ensureCaptcha(); };
 $('accountClose').onclick = () => $('accountDlg').close();
 $('accountDlg').addEventListener('click', e => { if (e.target === $('accountDlg')) $('accountDlg').close(); });
 document.querySelectorAll('#acctMode button').forEach(b => b.onclick = () => { acct.mode = b.dataset.m; $('acctMsg').textContent = ''; renderAccount(); });
@@ -4709,9 +4793,10 @@ $('avatarPick').onclick = async e => {
 $('pfSave').onclick = async () => {
   const name = $('pfName').value.trim();
   if (!/^[A-Za-z0-9_-]{3,16}$/.test(name)) { $('pfMsg').textContent = 'Username: 3–16 letters, digits, _ or -.'; return; }
+  if (!usernameOk(name)) { $('pfMsg').textContent = 'Please choose a different username.'; return; }
   const db = await sb();
   const { error } = await db.from('profiles').update({ username: name }).eq('id', acct.profile.id);
-  if (error) { $('pfMsg').textContent = /duplicate|unique/i.test(error.message) ? 'That username is taken.' : error.message; return; }
+  if (error) { $('pfMsg').textContent = /duplicate|unique/i.test(error.message) ? 'That username is taken.' : /username_clean|check constraint/i.test(error.message) ? 'Please choose a different username.' : error.message; return; }
   acct.profile.username = name; $('pfMsg').textContent = 'Saved ✓'; renderAcctChip();
   if (!vsName() || $('vsName').value.trim() === '') $('vsName').value = name;
 };
@@ -4726,7 +4811,7 @@ async function reportRanked(matchId, oppId, me, op) {
     if (data.status === 'done') {
       const d = data.delta;
       vsNote(`${$('vsNote').textContent} · MMR ${d >= 0 ? '+' : ''}${d}`);
-      await loadProfile(); renderAcctChip(); checkBadges();
+      await loadProfile(); renderAcctChip(); checkBadges(); renderLeaderboards(true);
       return;
     }
     if (data.status === 'mismatch') { vsNote(`${$('vsNote').textContent} · results didn't match, not ranked`); return; }
@@ -4832,6 +4917,7 @@ if (typeof Cube === 'undefined') {
   solver.init();
   autoReconnect();
   acctInit();
+  renderLeaderboards();
   setTimeout(checkBadges, 1500);
 }
 </script>

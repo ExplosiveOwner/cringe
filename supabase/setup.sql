@@ -31,13 +31,25 @@ revoke insert, update, delete on public.profiles from anon, authenticated;
 grant select on public.profiles to anon, authenticated;
 grant update (username, avatar, best_single) on public.profiles to authenticated;
 
+-- Usernames: block obvious abuse (checked on sign-up and on every rename).
+create or replace function public.username_ok(n text) returns boolean
+language sql immutable as $$
+  select n !~* '(fuck|shit|cunt|nigg|faggot|hitler|nazi|porn|kanker|hoer|bitch|whore|slut)'
+$$;
+alter table public.profiles drop constraint if exists profiles_username_clean;
+alter table public.profiles add constraint profiles_username_clean check (public.username_ok(username)) not valid;
+
+-- Leaderboard: only players with at least 3 ranked rounds are listed (games = wins + losses).
+alter table public.profiles add column if not exists games integer generated always as (wins + losses) stored;
+
 -- A profile is created automatically when someone signs up.
 create or replace function public.handle_new_user()
 returns trigger language plpgsql security definer set search_path = public as $$
 declare
   wanted text := coalesce(new.raw_user_meta_data ->> 'username', '');
 begin
-  if wanted !~ '^[A-Za-z0-9_-]{3,16}$' or exists (select 1 from public.profiles where username = wanted) then
+  if wanted !~ '^[A-Za-z0-9_-]{3,16}$' or not public.username_ok(wanted)
+     or exists (select 1 from public.profiles where username = wanted) then
     wanted := 'cuber_' || substr(replace(new.id::text, '-', ''), 1, 8);
   end if;
   insert into public.profiles (id, username) values (new.id, wanted) on conflict (id) do nothing;

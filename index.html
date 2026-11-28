@@ -4622,7 +4622,7 @@ const sfx = {
     if (this.ctx.state === 'suspended') this.ctx.resume();
     return this.ctx;
   },
-  /** Turn sound: a clicky mechanical keyboard switch — sharp actuation click, bottom-out clack, soft release tick. */
+  /** Turn sound: a soft, tactile mechanical key — a high tick, a lower tack and a faint release tick. */
   click() {
     if (!prefs.clicks) return;
     const ac = this.ac(); if (!ac) return;
@@ -4633,7 +4633,7 @@ const sfx = {
     const t0 = ac.currentTime + 0.003, jit = (a, b) => a + Math.random() * (b - a);
     // everything passes a gentle low-pass (no harsh fizz) and a master gain
     const out = ac.createGain(), lp = ac.createBiquadFilter();
-    lp.type = 'lowpass'; lp.frequency.value = 6500; lp.Q.value = 0.5; out.gain.value = 0.9;
+    lp.type = 'lowpass'; lp.frequency.value = 8000; lp.Q.value = 0.5; out.gain.value = 1.7;
     out.connect(lp).connect(ac.destination);
     // soft envelope: fade in over `att`, then a smooth exponential-like fade (no hard start or stop)
     const env = (g, t, vol, att, dur) => {
@@ -4654,15 +4654,13 @@ const sfx = {
       const end = env(g, t, vol, att, dur);
       o.connect(g).connect(out); o.start(t); o.stop(end);
     };
-    // 1. the click: a bright, short snap
-    burst(t0, 0.007, 'highpass', jit(2800, 3600), 0.7, 0.45, 0.001);
-    pip(t0, jit(3600, 4400), 0.008, 0.06, 0.001);
-    // 2. bottom-out ~10 ms later: the plastic "clack" plus a little body thump
-    const tb = t0 + jit(0.008, 0.013);
-    burst(tb, 0.03, 'bandpass', jit(1300, 1800), 1.8, 0.4, 0.002);
-    pip(tb, jit(200, 260), 0.04, 0.2, 0.003);
-    // 3. a quiet release tick as the key comes back up
-    burst(tb + jit(0.055, 0.075), 0.012, 'bandpass', jit(2200, 2800), 1.6, 0.1, 0.002);
+    // a soft, tactile key: a quick high "tick" and a slightly lower "tack" — short and light, no low thump
+    burst(t0, 0.004, 'bandpass', jit(4200, 5000), 1.1, 0.32, 0.0006);
+    const tb = t0 + jit(0.007, 0.011);
+    burst(tb, 0.006, 'bandpass', jit(2400, 3000), 2.2, 0.3, 0.0008);
+    pip(tb, jit(1700, 2100), 0.005, 0.025, 0.0008);
+    // a faint release tick
+    burst(tb + jit(0.045, 0.06), 0.004, 'bandpass', jit(3200, 3800), 1.6, 0.06, 0.0008);
   },
   tone(freqs, { dur = 0.22, type = 'sine', vol = 0.12, gap = 0.08 } = {}) {
     if (!prefs.effects) return;

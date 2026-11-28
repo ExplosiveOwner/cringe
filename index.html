@@ -312,6 +312,25 @@
   .mis-cubes > div { text-align: center; }
   .mis-cap { font-size: 14px; } .mis-cap b { font-family: var(--mono); color: var(--accent); }
   .site-foot a { color: var(--accent); }
+  .acct-chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 12px 5px 6px; max-width: 220px; }
+  .acct-chip #acctAvatar { font-size: 18px; width: 26px; height: 26px; display: grid; place-items: center; background: var(--panel2); border-radius: 50%; }
+  .acct-chip #acctLabel { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .form-grid { display: grid; gap: 8px; margin-top: 12px; }
+  .form-grid input, #pfName { font: inherit; color: var(--text); background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px; width: 100%; }
+  #pfName { flex: 1; min-width: 0; font-weight: 700; }
+  .profile-card { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+  .avatar-big { font-size: 34px; width: 64px; height: 64px; border-radius: 50%; padding: 0; flex: none; }
+  .avatar-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; margin-top: 10px; }
+  .avatar-pick button { font-size: 22px; padding: 6px 0; }
+  .badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .badge { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 8px; text-align: center; }
+  .badge .e { font-size: 28px; }
+  .badge .n { font-size: 12px; font-weight: 700; margin-top: 2px; }
+  .badge .d { font-size: 11px; color: var(--muted); }
+  .badge.locked { opacity: .38; filter: grayscale(1); }
+  #leaderboard tr.me td { color: var(--accent); font-weight: 700; }
+  #leaderboard th:nth-child(2), #leaderboard td:nth-child(2) { text-align: left; }
+  @media (max-width: 700px) { .acct-chip #acctLabel { max-width: 90px; } #btnAccount { position: absolute; top: 8px; right: 54px; } }
   .credits { padding-left: 18px; line-height: 1.6; }
   .site-foot { max-width: 1480px; margin: 0 auto; padding: 8px 20px 28px; display: flex; flex-wrap: wrap; gap: 10px;
     align-items: center; justify-content: space-between; color: var(--muted); font-size: 14px; }
@@ -401,6 +420,7 @@
     <button class="primary" id="btnConnect">Connect cube</button>
     <button id="btnConnectAll" title="Use this if your cube doesn't appear in the normal list">Show all devices</button>
     <button id="btnDisconnect" disabled>Disconnect</button>
+    <button class="acct-chip" id="btnAccount" title="Your account"><span id="acctAvatar">👤</span><span id="acctLabel">Sign in</span></button>
     <button class="icon-btn" id="btnSettings" title="Settings" aria-label="Settings">
       <svg viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
     </button>
@@ -728,6 +748,7 @@
         </div>
         <div class="match-sum hidden" id="vsMatch"></div>
         <div class="row" style="margin-top:12px;justify-content:center">
+          <label class="chk hidden" id="vsRankedWrap" title="Both players signed in: results change MMR"><input type="checkbox" id="vsRanked"> Ranked</label>
           <select id="vsBo" title="Match format"><option value="1">Single rounds</option><option value="5">Best of 5</option></select>
           <button class="primary" id="vsRound">Start round</button>
           <button id="vsGiveUp" class="hidden">Give up</button>
@@ -826,6 +847,45 @@
     <button id="btnFeature">💡 Request a feature</button>
   </div>
 </footer>
+<dialog class="sheet" id="accountDlg">
+  <div class="sheet-head"><h2 id="acctTitle">Your account</h2><button class="icon-btn" id="accountClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+  <div class="sheet-body">
+    <div id="acctOut">
+      <div class="seg" id="acctMode" style="margin-top:10px"><button data-m="in" class="active">Sign in</button><button data-m="up">Create account</button></div>
+      <div class="form-grid">
+        <input id="acctUser" maxlength="16" placeholder="Username (3–16 letters, digits, _ or -)" autocomplete="username" class="hidden">
+        <input id="acctEmail" type="email" placeholder="E-mail" autocomplete="email">
+        <input id="acctPass" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
+        <button class="primary" id="acctGo">Sign in</button>
+        <div class="msg" id="acctMsg"></div>
+      </div>
+      <p class="msg">An account keeps your MMR, badges and ranked 1v1 results, and shows you on the leaderboard. Your e-mail is only used to sign in.</p>
+    </div>
+    <div id="acctIn" class="hidden">
+      <div class="profile-card">
+        <button class="avatar-big" id="pfAvatar" title="Change avatar">🧊</button>
+        <div style="min-width:0;flex:1">
+          <div class="row"><input id="pfName" maxlength="16"><button id="pfSave">Save</button></div>
+          <div class="msg" id="pfMsg" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="avatar-pick hidden" id="avatarPick"></div>
+      <div class="tiles" style="margin-top:10px">
+        <div class="tile"><div class="k">MMR</div><div class="v" id="pfMmr">–</div></div>
+        <div class="tile"><div class="k">Wins / losses</div><div class="v" id="pfWl">–</div></div>
+        <div class="tile"><div class="k">Best single</div><div class="v" id="pfBest">–</div></div>
+      </div>
+      <h3>Badges <span class="msg" id="badgeCount"></span></h3>
+      <div class="badge-grid" id="badgeGrid"></div>
+      <h3>Leaderboard</h3>
+      <div class="tbl-wrap"><table id="leaderboard"></table></div>
+      <div class="row" style="margin-top:12px;justify-content:space-between">
+        <span class="msg" style="margin:0">Ranked: in 1v1, when you and your opponent are both signed in, the host can tick “Ranked”.</span>
+        <button id="acctOutBtn" class="danger">Sign out</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 <dialog class="sheet" id="featureDlg">
   <div class="sheet-head"><h2>Request a feature</h2><button class="icon-btn" id="featureClose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
   <div class="sheet-body">
@@ -1735,7 +1795,7 @@ function guideOnState(move, prev) {
     renderGuide(); return;
   }
   if (guideMethod === 'beginner') {
-    if (current === SOLVED) { if (bPlan) celebrate('Solved! 🎉'); bPlan = null; guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
+    if (current === SOLVED) { if (bPlan) { celebrate('Solved! 🎉'); awardBadge('guide_solved'); } bPlan = null; guide.clear(); bWaiting = false; bHold = 0; renderGuide(); return; }
     if (!bPlan) { beginnerStep(); return; }          // start guiding as soon as the cube moves
     const onTrack = guide.active && guide.track(current);
     if (onTrack && guide.idx === guide.moves.length) { beginnerStep(); return; }   // step finished
@@ -2338,6 +2398,8 @@ function finishSolve(total) {
   timer.phase = 'idle';
   $('timer').textContent = fmt(total);
   renderStats(); renderHistory(); renderDetail();
+  checkBadges();
+  if (acct.session && acct.profile && (!acct.profile.best_single || effTime(solve) < acct.profile.best_single)) loadProfile().then(renderAcctChip).catch(() => {});
   renderTimer(`Solved in ${fmt(total)}. Next scramble…`);
   setTimeout(() => { if (timer.phase === 'idle' && mode === 'timer') newScramble(); }, 800);
 }
@@ -2494,7 +2556,7 @@ function crossOnState() {
       Object.assign(xStats, { n: xStats.n + 1, moves: xStats.moves + xc.turns, optimal: xStats.optimal + opt, time: xStats.time + t });
       try { localStorage.setItem('micube.cross.v1', JSON.stringify(xStats)); } catch (e) { /* ignore */ }
       const best = xc.turns <= opt;
-      if (best) sfx.good(); else sfx.ding();
+      if (best) { sfx.good(); awardBadge('cross_opt'); } else sfx.ding();
       $('xResult').classList.remove('hidden');
       $('xResult').innerHTML = `<b>Your cross:</b> ${xc.turns} turns in ${fmt(t)}${best ? ' — optimal! 🎯' : ''}\n<b>Shortest possible:</b> ${opt} moves: ${xc.optimal.map(xView).join(' ') || '(already solved)'}`;
       crossRender(best ? 'Perfect — the shortest possible cross!' : `${xc.turns - opt} turn${xc.turns - opt === 1 ? '' : 's'} more than the shortest cross. Press “New cross scramble” for another.`);
@@ -2665,6 +2727,7 @@ function finishTrain(t) {
   const ok = judgeLook(c, train.rec.length, gaps);
   addCaseEvent(c.id, { d: Date.now(), src: 'train', ok: ok ? 1 : 0, t, n: train.rec.length });
   if (ok) sfx.good(); else sfx.bad();
+  checkBadges();
   train.phase = 'done';
   $('trTimer').textContent = fmt(t);
   renderTrainer(`${fmt(t)} · ${train.rec.length} turns · ${ok ? 'one-look ✓' : 'not one-look (pause or extra turns)'} — next case…`);
@@ -2872,6 +2935,7 @@ function tuJudge() {
     tuSave();
     $('tuFb').textContent = tu.wrong ? "✓ That's it." : `✓ Correct — ${(t / 1000).toFixed(2)} s`;
     sfx.good();
+    if (tuStats.best >= 50) awardBadge('turns50');
     if (!tu.wrong && tuStats.streak === tuStats.best && [10, 25, 50, 100].includes(tuStats.streak)) celebrate(`${tuStats.streak} in a row! 🔥`);
     $('tuFb').className = 'turn-fb ok';
     tuRender();
@@ -3119,7 +3183,7 @@ async function vsJoin() {
 
 function vsSetupConn(c, opened) {
   vs.conn = c;
-  const hello = () => { vsLobbyMsg(''); vsSend({ t: 'hi', role: 'player', name: vsName(), s: current }); vsRender(); };
+  const hello = () => { vsLobbyMsg(''); vsSend({ t: 'hi', role: 'player', name: vsName(), s: current, uid: acct.session ? acct.session.user.id : null }); vsRender(); };
   if (opened) hello(); else c.on('open', hello);
   c.on('data', vsOnData);
   c.on('close', () => {
@@ -3139,6 +3203,7 @@ function vsOnData(m) {
   if (!m || typeof m !== 'object') return;
   if (m.t === 'hi') {
     vs.oppName = String(m.name || 'Opponent').slice(0, 16); if (typeof m.s === 'string' && colorCountsOk(m.s)) vs.oppState = m.s;
+    vs.oppUid = typeof m.uid === 'string' && /^[0-9a-f-]{36}$/i.test(m.uid) ? m.uid : null;
     specSend({ t: 'names', host: vsName(), guest: vs.oppName, gs: vs.oppState }); vsRender();
   }
   else if (m.t === 'state' && typeof m.s === 'string' && colorCountsOk(m.s)) {
@@ -3150,6 +3215,8 @@ function vsOnData(m) {
   }
   else if (m.t === 'round' && typeof m.scramble === 'string') {
     vs.bo = m.bo === 5 ? 5 : 1; vs.roundNo = Number(m.n) || vs.roundNo + 1;
+    vs.ranked = !!m.ranked && !!acct.session && !!vs.oppUid && typeof m.mid === 'string' && m.mid.length <= 64;
+    vs.matchId = vs.ranked ? m.mid : null;
     vsStartRound(m.scramble);
   }
   else if (m.t === 'newmatch') vsResetMatch();
@@ -3168,7 +3235,9 @@ async function vsNewRound() {
   if (vs.matchOver) vsResetMatch(true);
   vs.bo = Number($('vsBo').value) === 5 ? 5 : 1;
   vs.roundNo++;
-  vsSend({ t: 'round', scramble, bo: vs.bo, n: vs.roundNo });
+  vs.ranked = !vs.bot && $('vsRanked').checked && !!acct.session && !!vs.oppUid;
+  vs.matchId = vs.ranked ? `${vs.code}-${Date.now().toString(36)}-${vs.roundNo}` : null;
+  vsSend({ t: 'round', scramble, bo: vs.bo, n: vs.roundNo, ranked: vs.ranked, mid: vs.matchId });
   specSend({ t: 'round', scramble, bo: vs.bo, n: vs.roundNo, score: vs.score });
   vsStartRound(scramble);
 }
@@ -3252,6 +3321,7 @@ function vsCheckFinish() {
 }
 
 function vsEndRound(aborted) {
+  if (!aborted && vs.ranked && vs.matchId) { const mid = vs.matchId; vs.matchId = null; setTimeout(() => reportRanked(mid, vs.oppUid, vs.myTime, vs.oppTime), 50); }
   cancelAnimationFrame(vs.raf); clearTimeout(vs.countTimer);
   vs.phase = 'idle'; vtrk.clear();
   $('vsTimer').className = 'vs-timer';
@@ -3438,6 +3508,7 @@ function vsRender() {
   $('vsOppTime').classList.toggle('win', done && vs.oppTime != null && (vs.myTime == null || vs.oppTime < vs.myTime));
   $('vsScore').textContent = `${vs.score[0]} – ${vs.score[1]}` + (vs.bo === 5 ? ' · best of 5' : '');
   $('vsWatchers').textContent = vs.specs.length ? `👀 ${vs.specs.length} watching` : '';
+  $('vsRankedWrap').classList.toggle('hidden', !vs.host || !!vs.bot || !acct.session || !vs.oppUid || vs.phase !== 'idle');
   $('vsBo').classList.toggle('hidden', !vs.host || vs.phase !== 'idle' || (vs.rounds.length > 0 && !vs.matchOver && vs.bo === 5));
   const sum = $('vsMatch');
   sum.classList.toggle('hidden', !(vs.bo === 5 && vs.rounds.length));
@@ -4443,9 +4514,9 @@ $('xNew').onclick = crossNew;
 
 /* ----------------------------- Online (Supabase) ------------------------- */
 // Public project settings — the anon key is meant to be public; access is controlled by row-level security.
-const SUPABASE_URL = '';
-const SUPABASE_KEY = '';
-const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js';
+const SUPABASE_URL = (window.SMARTCUBE_SUPABASE || {}).url || 'https://wweouoczrgidubsddeij.supabase.co';
+const SUPABASE_KEY = (window.SMARTCUBE_SUPABASE || {}).key || 'sb_publishable_tJudQZkuib60xIuRPifbsQ_DAVC5Ohu';
+const SUPABASE_JS = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js';
 const SUPPORT_URL = 'https://ko-fi.com/explosiveowner';
 let sbClient = null;
 const onlineReady = () => !!(SUPABASE_URL && SUPABASE_KEY);
@@ -4456,6 +4527,211 @@ async function sb() {
     sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
   }
   return sbClient;
+}
+
+/* ------------------------------ Accounts -------------------------------- */
+const acct = { session: null, profile: null, mode: 'in', server: new Set() };
+const AVATARS = ['🧊', '🟥', '🟧', '🟨', '🟩', '🟦', '⬜', '🐟', '🦊', '🐼', '🐸', '🐙', '🦄', '🐉', '🚀', '⚡', '🔥', '🌈', '👑', '🎯', '🧠', '🤖', '👾', '😎'];
+const BADGES = [
+  { id: 'first_solve', e: '🧊', name: 'First solve', desc: 'Finish a timed solve' },
+  { id: 'guide_solved', e: '🌼', name: 'Graduate', desc: 'Solve it with the beginner guide' },
+  { id: 'sub60', e: '⏱️', name: 'Under a minute', desc: 'Timed solve under 60 s' },
+  { id: 'sub30', e: '⚡', name: 'Under 30 s', desc: 'Timed solve under 30 s' },
+  { id: 'sub20', e: '🚀', name: 'Sub-20', desc: 'Timed solve under 20 s' },
+  { id: 'sub10', e: '👑', name: 'Sub-10', desc: 'Timed solve under 10 s' },
+  { id: 'solves100', e: '💯', name: 'Century', desc: '100 timed solves' },
+  { id: 'streak7', e: '🔥', name: 'On fire', desc: '7-day daily streak' },
+  { id: 'turns50', e: '🔤', name: 'Notation pro', desc: '50 correct turns in a row' },
+  { id: 'cross_opt', e: '✨', name: 'Perfect cross', desc: 'Shortest cross in the trainer' },
+  { id: 'beginner_all', e: '🎓', name: 'Algorithm student', desc: 'All beginner algorithms learned' },
+  { id: 'pll_all', e: '🎯', name: 'PLL master', desc: 'All 21 PLLs learned' },
+  { id: 'oll_all', e: '🧠', name: 'OLL master', desc: 'All 57 OLLs learned' },
+  { id: 'win1', e: '🥇', name: 'First win', desc: 'Win a ranked 1v1' },
+  { id: 'mmr1200', e: '🏆', name: 'Contender', desc: 'Reach 1200 MMR' },
+];
+let localBadges = {};
+try { localBadges = JSON.parse(localStorage.getItem('micube.badges.v1') || '{}') || {}; } catch (e) { localBadges = {}; }
+const hasBadge = id => !!localBadges[id] || acct.server.has(id);
+
+async function awardBadge(id) {
+  const b = BADGES.find(x => x.id === id);
+  if (!b || hasBadge(id)) return;
+  localBadges[id] = new Date().toISOString();
+  try { localStorage.setItem('micube.badges.v1', JSON.stringify(localBadges)); } catch (e) { /* ignore */ }
+  setTimeout(() => { sfx.ding(); toast(`${b.e} Badge unlocked: ${b.name}`, 3200); }, 900);
+  if (acct.session) pushBadges();
+  if ($('accountDlg').open) renderAccount();
+}
+/** Look at what you've done and award the badges you've earned. */
+function checkBadges() {
+  const t = solves.map(effTime).filter(isFinite);
+  const best = t.length ? Math.min(...t) : Infinity;
+  if (solves.length) awardBadge('first_solve');
+  if (best < 60000) awardBadge('sub60');
+  if (best < 30000) awardBadge('sub30');
+  if (best < 20000) awardBadge('sub20');
+  if (best < 10000) awardBadge('sub10');
+  if (solves.length >= 100) awardBadge('solves100');
+  if (dailyStreak() >= 7) awardBadge('streak7');
+  if (tuStats.best >= 50) awardBadge('turns50');
+  const learnedAll = set => CASES[set].length && CASES[set].every(c => caseStatus(c.id) === 'learned');
+  if (learnedAll('beg')) awardBadge('beginner_all');
+  if (learnedAll('pll')) awardBadge('pll_all');
+  if (learnedAll('oll')) awardBadge('oll_all');
+  if (acct.profile) {
+    if (acct.profile.wins >= 1) awardBadge('win1');
+    if (acct.profile.mmr >= 1200) awardBadge('mmr1200');
+  }
+}
+async function pushBadges() {
+  try {
+    const db = await sb(), uid = acct.session.user.id;
+    const missing = Object.keys(localBadges).filter(id => !acct.server.has(id) && BADGES.some(b => b.id === id));
+    if (!missing.length) return;
+    const { error } = await db.from('user_badges').upsert(missing.map(badge => ({ user_id: uid, badge })), { onConflict: 'user_id,badge', ignoreDuplicates: true });
+    if (!error) missing.forEach(id => acct.server.add(id));
+  } catch (e) { log('Badge sync failed: ' + e.message); }
+}
+
+async function loadProfile() {
+  if (!acct.session) { acct.profile = null; acct.server = new Set(); return; }
+  const db = await sb(), uid = acct.session.user.id;
+  const [{ data: prof }, { data: bdg }] = await Promise.all([
+    db.from('profiles').select('id, username, avatar, mmr, wins, losses, best_single').eq('id', uid).maybeSingle(),
+    db.from('user_badges').select('badge').eq('user_id', uid),
+  ]);
+  acct.profile = prof || null;
+  acct.server = new Set((bdg || []).map(x => x.badge));
+  // keep the best single online up to date
+  const t = solves.map(effTime).filter(isFinite), best = t.length ? Math.min(...t) : null;
+  if (acct.profile && best && (!acct.profile.best_single || best < acct.profile.best_single)) {
+    const { error } = await db.from('profiles').update({ best_single: Math.round(best) }).eq('id', uid);
+    if (!error) acct.profile.best_single = Math.round(best);
+  }
+  await pushBadges();
+}
+
+function renderAcctChip() {
+  const pf = acct.profile;
+  $('acctAvatar').textContent = pf ? pf.avatar : '👤';
+  $('acctLabel').textContent = pf ? `${pf.username} · ${pf.mmr}` : 'Sign in';
+}
+
+async function renderAccount() {
+  const inside = !!acct.session;
+  $('acctOut').classList.toggle('hidden', inside);
+  $('acctIn').classList.toggle('hidden', !inside);
+  $('acctTitle').textContent = inside ? 'Your profile' : 'Your account';
+  document.querySelectorAll('#acctMode button').forEach(b => b.classList.toggle('active', b.dataset.m === acct.mode));
+  $('acctUser').classList.toggle('hidden', acct.mode !== 'up');
+  $('acctGo').textContent = acct.mode === 'up' ? 'Create account' : 'Sign in';
+  $('acctPass').autocomplete = acct.mode === 'up' ? 'new-password' : 'current-password';
+  $('badgeCount').textContent = `${BADGES.filter(b => hasBadge(b.id)).length} / ${BADGES.length}`;
+  $('badgeGrid').innerHTML = BADGES.map(b => `<div class="badge${hasBadge(b.id) ? '' : ' locked'}" title="${b.desc}"><div class="e">${b.e}</div><div class="n">${b.name}</div><div class="d">${b.desc}</div></div>`).join('');
+  if (!inside) return;
+  const pf = acct.profile;
+  if (pf) {
+    $('pfAvatar').textContent = pf.avatar;
+    if (document.activeElement !== $('pfName')) $('pfName').value = pf.username;
+    $('pfMmr').textContent = pf.mmr; $('pfWl').textContent = `${pf.wins} / ${pf.losses}`; $('pfBest').textContent = fmt(pf.best_single);
+  }
+  try {
+    const db = await sb();
+    const { data } = await db.from('profiles').select('id, username, avatar, mmr, wins, losses').order('mmr', { ascending: false }).order('wins', { ascending: false }).limit(50);
+    const rows = data || [];
+    $('leaderboard').innerHTML = '<tr><th>#</th><th>Player</th><th>MMR</th><th>W / L</th></tr>' + (rows.length
+      ? rows.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td>${i + 1}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${r.mmr}</td><td>${r.wins} / ${r.losses}</td></tr>`).join('')
+      : '<tr><td colspan="4" class="msg">No players yet.</td></tr>');
+  } catch (e) { $('leaderboard').innerHTML = `<tr><td class="msg">Leaderboard unavailable: ${escapeHtml(e.message)}</td></tr>`; }
+}
+const escapeHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+
+async function acctSubmit() {
+  const email = $('acctEmail').value.trim(), password = $('acctPass').value, username = $('acctUser').value.trim();
+  const msg = t => { $('acctMsg').textContent = t; };
+  if (!/^\S+@\S+\.\S+$/.test(email)) return msg('Enter a valid e-mail address.');
+  if (password.length < 6) return msg('The password needs at least 6 characters.');
+  if (acct.mode === 'up' && !/^[A-Za-z0-9_-]{3,16}$/.test(username)) return msg('Username: 3–16 letters, digits, _ or -.');
+  $('acctGo').disabled = true; msg(acct.mode === 'up' ? 'Creating your account…' : 'Signing in…');
+  try {
+    const db = await sb();
+    if (acct.mode === 'up') {
+      const { data: taken } = await db.from('profiles').select('id').eq('username', username).maybeSingle();
+      if (taken) throw new Error('That username is taken — pick another one.');
+      const { data, error } = await db.auth.signUp({ email, password, options: { data: { username } } });
+      if (error) throw error;
+      if (!data.session) { msg('Account created — check your e-mail to confirm it, then sign in.'); return; }
+    } else {
+      const { error } = await db.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    }
+    $('acctPass').value = ''; msg('');
+  } catch (e) {
+    msg(/invalid login/i.test(e.message || '') ? 'Wrong e-mail or password.' : (e.message || String(e)));
+  } finally { $('acctGo').disabled = false; }
+}
+
+async function acctInit() {
+  if (!onlineReady()) return;
+  try {
+    const db = await sb();
+    db.auth.onAuthStateChange((event, session) => {
+      acct.session = session;
+      setTimeout(async () => {
+        try { await loadProfile(); } catch (e) { log('Profile: ' + e.message); }
+        renderAcctChip(); checkBadges();
+        if ($('accountDlg').open) renderAccount();
+        if (mode === 'vs') { if (vs.conn && vs.conn.open && !vs.bot && !vs.watch) vsSend({ t: 'hi', role: 'player', name: vsName(), s: current, uid: session ? session.user.id : null }); vsRender(); }
+        if (event === 'SIGNED_IN' && acct.profile && $('accountDlg').open) toast(`Welcome, ${acct.profile.username}! ${acct.profile.avatar}`);
+      }, 0);
+    });
+  } catch (e) { log('Accounts unavailable: ' + e.message); }
+}
+
+$('btnAccount').onclick = () => { $('accountDlg').showModal(); renderAccount(); if (!onlineReady()) $('acctMsg').textContent = 'Online accounts are not set up yet.'; };
+$('accountClose').onclick = () => $('accountDlg').close();
+$('accountDlg').addEventListener('click', e => { if (e.target === $('accountDlg')) $('accountDlg').close(); });
+document.querySelectorAll('#acctMode button').forEach(b => b.onclick = () => { acct.mode = b.dataset.m; $('acctMsg').textContent = ''; renderAccount(); });
+$('acctGo').onclick = acctSubmit;
+$('acctPass').onkeydown = e => { if (e.key === 'Enter') acctSubmit(); };
+$('acctOutBtn').onclick = async () => { try { (await sb()).auth.signOut(); } catch (e) { /* ignore */ } };
+$('pfAvatar').onclick = () => {
+  const pick = $('avatarPick');
+  pick.innerHTML = AVATARS.map(a => `<button data-a="${a}">${a}</button>`).join('');
+  pick.classList.toggle('hidden');
+};
+$('avatarPick').onclick = async e => {
+  const b = e.target.closest('[data-a]'); if (!b || !acct.profile) return;
+  const db = await sb();
+  const { error } = await db.from('profiles').update({ avatar: b.dataset.a }).eq('id', acct.profile.id);
+  if (!error) { acct.profile.avatar = b.dataset.a; $('avatarPick').classList.add('hidden'); renderAcctChip(); renderAccount(); }
+};
+$('pfSave').onclick = async () => {
+  const name = $('pfName').value.trim();
+  if (!/^[A-Za-z0-9_-]{3,16}$/.test(name)) { $('pfMsg').textContent = 'Username: 3–16 letters, digits, _ or -.'; return; }
+  const db = await sb();
+  const { error } = await db.from('profiles').update({ username: name }).eq('id', acct.profile.id);
+  if (error) { $('pfMsg').textContent = /duplicate|unique/i.test(error.message) ? 'That username is taken.' : error.message; return; }
+  acct.profile.username = name; $('pfMsg').textContent = 'Saved ✓'; renderAcctChip();
+  if (!vsName() || $('vsName').value.trim() === '') $('vsName').value = name;
+};
+
+/* Ranked 1v1: both apps report the round; the server applies Elo once both reports agree. */
+async function reportRanked(matchId, oppId, me, op) {
+  if (!acct.session || !oppId) return;
+  const db = await sb();
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const { data, error } = await db.rpc('report_match', { p_match: matchId, p_opponent: oppId, p_my_time: me == null ? null : Math.round(me), p_opp_time: op == null ? null : Math.round(op) });
+    if (error) { vsNote(`${$('vsNote').textContent} · ranking failed: ${error.message}`); return; }
+    if (data.status === 'done') {
+      const d = data.delta;
+      vsNote(`${$('vsNote').textContent} · MMR ${d >= 0 ? '+' : ''}${d}`);
+      await loadProfile(); renderAcctChip(); checkBadges();
+      return;
+    }
+    if (data.status === 'mismatch') { vsNote(`${$('vsNote').textContent} · results didn't match, not ranked`); return; }
+    await new Promise(r => setTimeout(r, 1500));          // waiting for the opponent's report
+  }
 }
 
 /* Feature requests go to the project's feature_requests table (insert-only for players). */
@@ -4555,6 +4831,8 @@ if (typeof Cube === 'undefined') {
   setMode(['timer', 'train', 'vs', 'turns'].includes(saved) ? saved : 'guide');
   solver.init();
   autoReconnect();
+  acctInit();
+  setTimeout(checkBadges, 1500);
 }
 </script>
 </body>

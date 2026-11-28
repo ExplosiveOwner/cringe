@@ -878,7 +878,7 @@
       <div class="form-grid">
         <input id="acctUser" maxlength="16" placeholder="Username (3–16 letters, digits, _ or -)" autocomplete="username" class="hidden">
         <input id="acctEmail" type="email" placeholder="E-mail" autocomplete="email">
-        <input id="acctPass" type="password" placeholder="Password (at least 6 characters)" autocomplete="current-password">
+        <input id="acctPass" type="password" placeholder="Password (at least 8 characters)" autocomplete="current-password">
         <div id="captchaBox"></div>
         <button class="primary" id="acctGo">Sign in</button>
         <div class="msg" id="acctMsg"></div>
@@ -3572,8 +3572,8 @@ function vsRender() {
   const sum = $('vsMatch');
   sum.classList.toggle('hidden', !(vs.bo === 5 && vs.rounds.length));
   if (vs.bo === 5 && vs.rounds.length) {
-    sum.innerHTML = `<h4>${vs.matchOver ? (vs.score[0] > vs.score[1] ? '🏆 You won the match' : `${vs.oppName || 'Opponent'} won the match`) : `Best of 5 — round ${vs.rounds.length + (vs.phase === 'idle' ? 0 : 1)}`}</h4>` +
-      `<table><tr><th>Round</th><th>You</th><th>${vs.oppName || 'Opponent'}</th></tr>` +
+    sum.innerHTML = `<h4>${vs.matchOver ? (vs.score[0] > vs.score[1] ? '🏆 You won the match' : `${escapeHtml(vs.oppName || 'Opponent')} won the match`) : `Best of 5 — round ${vs.rounds.length + (vs.phase === 'idle' ? 0 : 1)}`}</h4>` +
+      `<table><tr><th>Round</th><th>You</th><th>${escapeHtml(vs.oppName || 'Opponent')}</th></tr>` +
       vs.rounds.map((r, i) => `<tr><td>${i + 1}</td><td${r.me != null && (r.op == null || r.me < r.op) ? ' style="color:var(--ok);font-weight:700"' : ''}>${r.me == null ? 'DNF' : fmt(r.me)}</td><td${r.op != null && (r.me == null || r.op < r.me) ? ' style="color:var(--ok);font-weight:700"' : ''}>${r.op == null ? 'DNF' : fmt(r.op)}</td></tr>`).join('') + '</table>';
   }
   const inRound = ['scrambling', 'countdown', 'running'].includes(vs.phase);
@@ -4702,11 +4702,11 @@ function lbFastHTML(rows, limit) {
   const pf = acct.profile, medal = i => ['🥇', '🥈', '🥉'][i] || i + 1;
   const list = rows.slice(0, limit);
   let html = '<tr><th class="rank">#</th><th>Player</th><th>Best single</th></tr>' + (list.length
-    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${fmt(r.best_single)}</td></tr>`).join('')
+    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${escapeHtml(r.avatar)} ${escapeHtml(r.username)}</td><td>${fmt(r.best_single)}</td></tr>`).join('')
     : '<tr><td colspan="3" class="msg">No solves yet — sign in and do a timed solve to be the first!</td></tr>');
   if (pf) {
     const at = rows.findIndex(r => r.id === pf.id);
-    if (at < 0 || at >= limit) html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${pf.avatar} ${escapeHtml(pf.username)}</td><td>${pf.best_single ? fmt(pf.best_single) : 'do a timed solve'}</td></tr>`;
+    if (at < 0 || at >= limit) html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${escapeHtml(pf.avatar)} ${escapeHtml(pf.username)}</td><td>${pf.best_single ? fmt(pf.best_single) : 'do a timed solve'}</td></tr>`;
   }
   return html;
 }
@@ -4714,13 +4714,13 @@ function lbHTML(rows, limit, wl) {
   const pf = acct.profile, medal = i => ['🥇', '🥈', '🥉'][i] || i + 1;
   const list = rows.slice(0, limit);
   let html = `<tr><th class="rank">#</th><th>Player</th><th>MMR</th>${wl ? '<th>W / L</th>' : ''}</tr>` + (list.length
-    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${r.avatar} ${escapeHtml(r.username)}</td><td>${r.mmr}</td>${wl ? `<td>${r.wins} / ${r.losses}</td>` : ''}</tr>`).join('')
+    ? list.map((r, i) => `<tr class="${pf && r.id === pf.id ? 'me' : ''}"><td class="rank">${medal(i)}</td><td>${escapeHtml(r.avatar)} ${escapeHtml(r.username)}</td><td>${r.mmr}</td>${wl ? `<td>${r.wins} / ${r.losses}</td>` : ''}</tr>`).join('')
     : `<tr><td colspan="${wl ? 4 : 3}" class="msg">No ranked players yet — win ranked 1v1 rounds to be the first!</td></tr>`);
   if (pf) {
     const at = rows.findIndex(r => r.id === pf.id);
     if (at < 0 || at >= limit) {
       const left = Math.max(0, 3 - pf.wins - pf.losses);
-      html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${pf.avatar} ${escapeHtml(pf.username)}</td><td>${pf.mmr}</td>${wl ? `<td>${left ? `${left} more ranked to be listed` : `${pf.wins} / ${pf.losses}`}</td>` : ''}</tr>`;
+      html += `<tr class="me"><td class="rank">${at < 0 ? '–' : at + 1}</td><td>${escapeHtml(pf.avatar)} ${escapeHtml(pf.username)}</td><td>${pf.mmr}</td>${wl ? `<td>${left ? `${left} more ranked to be listed` : `${pf.wins} / ${pf.losses}`}</td>` : ''}</tr>`;
     }
   }
   return html;
@@ -4776,7 +4776,7 @@ async function renderAccount() {
     $('leaderboard').innerHTML = lbHTML(rows, 50, true);
   } catch (e) { $('leaderboard').innerHTML = `<tr><td class="msg">Leaderboard unavailable: ${escapeHtml(e.message)}</td></tr>`; }
 }
-const escapeHtml = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+function escapeHtml(t) { return  String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]); }
 
 /* CAPTCHA: one fresh token per sign-in / sign-up attempt. */
 let captchaWidget = null;
@@ -4801,7 +4801,8 @@ async function acctSubmit() {
   if (TURNSTILE_SITEKEY && !acct.captcha) return msg('Please complete the robot check first.');
   const captchaToken = acct.captcha || undefined;
   if (!/^\S+@\S+\.\S+$/.test(email)) return msg('Enter a valid e-mail address.');
-  if (password.length < 6) return msg('The password needs at least 6 characters.');
+  if (acct.mode === 'up' && password.length < 8) return msg('The password needs at least 8 characters.');
+  if (!password) return msg('Enter your password.');
   if (acct.mode === 'up' && !/^[A-Za-z0-9_-]{3,16}$/.test(username)) return msg('Username: 3–16 letters, digits, _ or -.');
   $('acctGo').disabled = true; msg(acct.mode === 'up' ? 'Creating your account…' : 'Signing in…');
   try {
@@ -4881,6 +4882,7 @@ async function reportRanked(matchId, oppId, me, op) {
       await loadProfile(); renderAcctChip(); checkBadges(); renderLeaderboards(true);
       return;
     }
+    if (data.status === 'limit') { vsNote(`${$('vsNote').textContent} · daily ranked limit with this player reached, not ranked`); return; }
     if (data.status === 'mismatch') { vsNote(`${$('vsNote').textContent} · results didn't match, not ranked`); return; }
     await new Promise(r => setTimeout(r, 1500));          // waiting for the opponent's report
   }
@@ -4899,7 +4901,7 @@ $('featureSend').onclick = async () => {
     if (error) throw error;
     $('featureText').value = ''; $('featureDlg').close(); toast('Thanks! Your idea was sent 💡');
   } catch (e) {
-    $('featureMsg').textContent = onlineReady() ? 'Could not send: ' + (e.message || e) : 'Sending ideas works once the online features are set up.';
+    $('featureMsg').textContent = !onlineReady() ? 'Sending ideas works once the online features are set up.' : /too many/i.test(e.message || '') ? 'Lots of ideas coming in right now — please try again in a few minutes.' : 'Could not send: ' + (e.message || e);
   } finally { $('featureSend').disabled = false; }
 };
 $('btnSupport').onclick = () => {
